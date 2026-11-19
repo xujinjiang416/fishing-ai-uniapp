@@ -1,0 +1,56 @@
+{
+    "name" : "渔获 AI",
+    "appid" : "__UNI__EF3DF44",
+    "description" : "渔获 AI · 钓鱼助手（AI 钓鱼天气 / 附近野塘 / 积分商城）",
+    "versionName" : "1.0.0",
+    "versionCode" : "100",
+    "transformPx" : false,
+    "vueVersion" : "3",
+    "app-plus" : {
+        "usingComponents" : true,
+        "nvueStyleCompiler" : "uni-app",
+        "compilerVersion" : 3,
+        "splashscreen" : {
+            "alwaysShowBeforeRender" : true,
+            "waiting" : true,
+            "autoclose" : true,
+            "delay" : 0
+        },
+        "modules" : {},
+        "distribute" : {
+            "android" : {
+                "permissions" : [
+                    "<uses-permission android:name=\"android.permission.ACCESS_COARSE_LOCATION\"/>",
+                    "<uses-permission android:name=\"android.permission.ACCESS_FINE_LOCATION\"/>",
+                    "<uses-permission android:name=\"android.permission.INTERNET\"/>"
+                ]
+            },
+            "ios" : {},
+            "sdkConfigs" : {}
+        }
+    },
+    "quickapp" : {},
+    "mp-weixin" : {
+        "appid" : "wx9472bc3694dd2892",
+        "setting" : {
+            "urlCheck" : false,
+            "es6" : true,
+            "minified" : true
+        },
+        "usingComponents" : true,
+        "permission" : {
+            "scope.userLocation" : {
+                "desc" : "你的位置信息将用于查找附近的野塘钓点与本地气象"
+            }
+        },
+        "requiredPrivateInfos" : [ "getLocation" ],
+        "lazyCodeLoading" : "requiredComponents"
+    },
+    "h5" : {
+        "router" : {
+            "mode" : "hash"
+        },
+        "title" : "渔获 AI · 钓鱼助手"
+    },
+    "vue3" : {}
+}

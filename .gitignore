@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+
+# uni-app build output
+unpackage/
+
+# local env / secrets
+.env
+.env.local
+.env.*.local
+
+# editor & os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log

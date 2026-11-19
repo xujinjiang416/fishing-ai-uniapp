@@ -1,0 +1,13 @@
+/* uni.scss —— 全局 SCSS 变量（uni-app 自动注入所有组件样式）
+ * 设计真源见 App.vue 的 :root / page CSS 变量与 common 层。
+ * 此文件只保留少量 scss 变量，避免与 CSS 变量重复维护。
+ */
+$c-primary: #0F8B8D;
+$c-primary-dark: #0A6A6C;
+$c-accent: #FF7A3D;
+$c-gold: #C08A2E;
+$c-ink: #12211F;
+$c-ink-3: #6E807E;
+$c-bg: #F4F7F6;
+$app-w: 430px;
+$tabbar-h: 64px;
