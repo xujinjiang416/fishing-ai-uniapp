@@ -98,13 +98,13 @@
           <view class="section">
             <view class="section__head">
               <view class="section__title"><text>我的订单</text></view>
-              <view class="section__more" @click="go('/pages/shop/shop')">
-                <text>去商城</text>
+              <view class="section__more" @click="go('/pages/orders/orders')">
+                <text>全部订单</text>
                 <AppIcon name="chevron-right" :size="13" color="#0A6A6C" />
               </view>
             </view>
             <view v-if="orders.length" class="list">
-              <view v-for="o in orders" :key="o.no" class="item">
+              <view v-for="o in orders" :key="o.no" class="item" @click="openOrder(o.no)">
                 <view class="cell__icon cell__icon--gold item__ic-lg">
                   <AppIcon name="package" :size="20" color="#C08A2E" />
                 </view>
@@ -128,7 +128,7 @@
                     </view>
                   </view>
                 </view>
-                <text class="tag order-tag" :class="orderTagCls(o.status)">{{ o.status }}</text>
+                <text class="tag order-tag" :class="statusMeta(o.status).cls">{{ statusMeta(o.status).text }}</text>
               </view>
             </view>
             <view v-else class="empty">
@@ -200,6 +200,14 @@
                 </view>
                 <view class="cell__arrow"><AppIcon name="chevron-right" :size="18" color="#9AA9A7" /></view>
               </view>
+              <view class="cell" @click="go('/pages/address/address')">
+                <view class="cell__icon"><AppIcon name="truck" :size="18" color="#0A6A6C" /></view>
+                <view class="grow">
+                  <text class="cell__t">收货地址</text>
+                  <text class="cell__d">管理下单使用的收货信息</text>
+                </view>
+                <view class="cell__arrow"><AppIcon name="chevron-right" :size="18" color="#9AA9A7" /></view>
+              </view>
               <view class="cell" @click="notifyOn = !notifyOn">
                 <view class="cell__icon"><AppIcon name="bell" :size="18" color="#0A6A6C" /></view>
                 <view class="grow">
@@ -253,7 +261,7 @@ import AppTabBar from '../../components/AppTabBar.vue'
 import AppOverlays from '../../components/AppOverlays.vue'
 import Api from '../../common/api.js'
 import Store from '../../common/state.js'
-import { money } from '../../common/utils.js'
+import { money, orderStatusMeta } from '../../common/utils.js'
 import { statusBarHeight } from '../../common/sys.js'
 import * as ui from '../../common/ui.js'
 import { nav } from '../../common/nav.js'
@@ -324,8 +332,9 @@ export default {
         Store.save()
       })
     },
-    orderTagCls(s) {
-      return s === '待发货' ? 'tag--warn' : (s === '已完成' ? 'tag--success' : 'tag--primary')
+    statusMeta(status) { return orderStatusMeta(status) },
+    openOrder(no) {
+      nav('/pages/order-detail/order-detail?no=' + encodeURIComponent(no))
     },
     onQuick(x) {
       if (x.act === 'fav') { ui.toast('共收藏 ' + this.favorites + ' 个钓点'); return }

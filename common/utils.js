@@ -35,6 +35,77 @@ export function ratingText(v) {
   return n.toFixed(1)
 }
 
+/* ---------------- 订单状态（小程序端统一展示口径） ----------------
+ * 后端原始状态 -> 用户可读状态（待付款 / 待发货 / 待收货 / 已完成 / 已取消）。
+ * 商品评价功能已移除：订单完成后直接进入「已完成」，不再有「待评价」节点。
+ */
+const ORDER_STATUS_MAP = {
+  '待支付': {
+    key: 'unpaid', text: '待付款', desc: '订单已创建，请尽快完成支付',
+    icon: 'wallet', color: '#E8662B', cls: 'tag--accent'
+  },
+  '待发货': {
+    key: 'unshipped', text: '待发货', desc: '商家正在备货，请耐心等待',
+    icon: 'package', color: '#0A6A6C', cls: 'tag--primary'
+  },
+  '已发货': {
+    key: 'shipped', text: '待收货', desc: '商品已发出，请留意物流信息并及时查收',
+    icon: 'truck', color: '#1B7FD4', cls: 'tag--primary'
+  },
+  '已完成': {
+    key: 'completed', text: '已完成', desc: '订单已完成，感谢您的购买',
+    icon: 'circle-check', color: '#1D7A50', cls: 'tag--success'
+  },
+  '已关闭': {
+    key: 'cancelled', text: '已取消', desc: '订单已取消，如有需要请重新下单',
+    icon: 'x', color: '#6E807E', cls: 'tag--mute'
+  },
+  '退款中': {
+    key: 'refunding', text: '退款中', desc: '退款申请处理中，请耐心等待',
+    icon: 'refresh-cw', color: '#E8662B', cls: 'tag--accent'
+  },
+  '部分退款': {
+    key: 'partial', text: '部分退款', desc: '部分金额已退款到账',
+    icon: 'coins', color: '#C08A2E', cls: 'tag--gold'
+  },
+  '已退款': {
+    key: 'refunded', text: '已退款', desc: '退款已完成',
+    icon: 'coins', color: '#6E807E', cls: 'tag--mute'
+  }
+}
+
+export function orderStatusMeta(status) {
+  return ORDER_STATUS_MAP[status] || {
+    key: 'unknown', text: status || '--', desc: '',
+    icon: 'info', color: '#6E807E', cls: 'tag--mute'
+  }
+}
+
+/** 订单状态流转节点（含当前节点状态：done / current / todo） */
+export function orderFlow(status) {
+  if (status === '已关闭') {
+    return [
+      { key: 'unpaid', text: '待付款', state: 'done' },
+      { key: 'cancelled', text: '已取消', state: 'current' }
+    ]
+  }
+  const nodes = [
+    { key: 'unpaid', text: '待付款' },
+    { key: 'unshipped', text: '待发货' },
+    { key: 'shipped', text: '待收货' },
+    { key: 'completed', text: '已完成' }
+  ]
+  // 退款类状态按已支付 / 已发货 / 已完成节点近似定位
+  const indexMap = {
+    '待支付': 0, '待发货': 1, '已发货': 2, '已完成': 3,
+    '退款中': 2, '部分退款': 3, '已退款': 3
+  }
+  const current = indexMap[status] != null ? indexMap[status] : 0
+  return nodes.map((n, i) => Object.assign({}, n, {
+    state: i < current ? 'done' : (i === current ? 'current' : 'todo')
+  }))
+}
+
 /** 星级填充百分比（用于叠加裁剪实现半星） */
 export function starsPercent(n) {
   return (Math.round(n) / 5 * 100) + '%'

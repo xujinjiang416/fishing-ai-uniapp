@@ -40,6 +40,32 @@
             </view>
           </view>
 
+          <!-- 收货地址（支付前必须选择） -->
+          <view class="card card--pad addr-card" @click="openAddressPicker">
+            <view v-if="selectedAddress" class="row" style="gap: 12px; align-items: flex-start">
+              <view class="addr-ic"><AppIcon name="map-pin" :size="18" color="#0A6A6C" /></view>
+              <view class="grow" style="min-width: 0">
+                <view class="row" style="gap: 8px; flex-wrap: wrap">
+                  <text class="addr-name">{{ selectedAddress.receiver }}</text>
+                  <text class="addr-phone num">{{ selectedAddress.phone }}</text>
+                  <text v-if="selectedAddress.isDefault" class="tag tag--primary">默认</text>
+                </view>
+                <text class="addr-text">{{ selectedAddress.fullAddress }}</text>
+              </view>
+              <AppIcon name="chevron-right" :size="18" color="#9AA9A7" />
+            </view>
+            <view v-else class="row" style="gap: 12px">
+              <view class="addr-ic addr-ic--warn">
+                <AppIcon name="alert-triangle" :size="18" color="#A97410" />
+              </view>
+              <view class="grow" style="min-width: 0">
+                <text class="addr-name">请添加收货地址</text>
+                <text class="addr-text">下单前需填写有效收货信息</text>
+              </view>
+              <view class="btn btn--ghost btn--sm addr-add" @click.stop="addNewAddress">新增</view>
+            </view>
+          </view>
+
           <!-- 积分抵扣 -->
           <view class="section">
             <view class="section__head">
@@ -187,6 +213,8 @@ export default {
       qty: 1,
       usePoints: 0,
       maxUsable: 0,
+      addresses: [],
+      selectedAddressId: 0,
       services: [
         { ic: 'shield-check', t: '正品保障' },
         { ic: 'truck', t: '顺丰包邮' },
@@ -207,14 +235,53 @@ export default {
       return this.usePoints > 0
         ? '使用 ' + this.usePoints + ' 积分抵 ¥' + this.deduct.toFixed(2)
         : '未使用积分抵扣'
+    },
+    selectedAddress() {
+      return this.addresses.filter(a => a.id === this.selectedAddressId)[0] || null
     }
   },
   onLoad(options) {
     this.goodsId = (options && options.id) || 'g1'
     this.load()
   },
+  onShow() {
+    // 从地址列表 / 新增地址返回时，自动选中并刷新
+    this.loadAddresses()
+  },
   methods: {
     money,
+    async loadAddresses() {
+      const res = await Api.fetchAddresses()
+      if (res.code !== 0 || !Array.isArray(res.data)) {
+        this.addresses = []
+        this.selectedAddressId = 0
+        return
+      }
+      this.addresses = res.data
+
+      let pending = 0
+      try {
+        pending = Number(uni.getStorageSync('fishai.pendingAddressId') || 0)
+        if (pending) uni.removeStorageSync('fishai.pendingAddressId')
+      } catch (e) { /* ignore */ }
+
+      if (pending && this.addresses.some(a => a.id === pending)) {
+        this.selectedAddressId = pending
+        return
+      }
+      if (this.selectedAddressId && this.addresses.some(a => a.id === this.selectedAddressId)) {
+        return
+      }
+      const def = this.addresses.filter(a => a.isDefault)[0] || this.addresses[0]
+      this.selectedAddressId = def ? def.id : 0
+    },
+    openAddressPicker() {
+      if (!this.addresses.length) { this.addNewAddress(); return }
+      nav('/pages/address/address?select=1')
+    },
+    addNewAddress() {
+      nav('/pages/address-edit/address-edit?select=1&back=1')
+    },
     load() {
       Api.fetchGoodsDetail(this.goodsId).then(res => {
         if (res.code !== 0 || !res.data) { ui.toast(res.msg || '商品加载失败，请重试', 'alert-triangle'); return }
@@ -241,9 +308,22 @@ export default {
       this.usePoints = Math.min(Number(v) * this.pointsPerYuan, this.maxUsable)
     },
     async buy() {
+      // 支付前置校验：必须已选择有效收货地址
+      if (!this.selectedAddress) {
+        const go = await ui.confirm({
+          title: '请先填写收货地址',
+          text: '下单前需要填写有效的收货信息，是否现在去填写？',
+          okText: '去填写',
+          cancelText: '取消'
+        })
+        if (go) this.addNewAddress()
+        return
+      }
       const yes = await ui.confirm({
         title: '确认下单',
         text: this.G.name + ' × ' + this.qty
+          + '\n收货人 ' + this.selectedAddress.receiver + ' ' + this.selectedAddress.phone
+          + '\n' + this.selectedAddress.fullAddress
           + '\n积分抵扣 ' + this.usePoints + ' 分（-¥' + this.deduct.toFixed(2) + '）'
           + '\n实付 ¥' + this.pay.toFixed(2),
         okText: '确认支付 ¥' + this.pay.toFixed(2)
@@ -251,7 +331,19 @@ export default {
       if (yes) this.doOrder()
     },
     doOrder() {
-      Api.createOrder({ goodsId: this.G.id, qty: this.qty, usePoints: this.usePoints }).then(res => {
+      if (!this.selectedAddress) { this.openAddressPicker(); return }
+      Api.createOrder({
+        goodsId: this.G.id,
+        qty: this.qty,
+        usePoints: this.usePoints,
+        addressId: this.selectedAddress.id
+      }).then(res => {
+        if (res.code === 1002) {
+          // 地址被删除 / 失效：引导重新选择
+          ui.toast(res.msg || '收货地址无效，请重新选择', 'alert-triangle')
+          this.loadAddresses()
+          return
+        }
         if (res.code !== 0 || !res.data) { ui.toast(res.msg || '下单失败，请重试', 'alert-triangle'); return }
         const o = res.data
         // 服务端已扣减积分，本地同步该余额，不再伪造本地订单
@@ -259,10 +351,10 @@ export default {
         this.qty = 1
         this.usePoints = 0
         this.calcMax()
-        this.pay(o)
+        this.payOrder(o)
       })
     },
-    pay(o) {
+    payOrder(o) {
       // 消费后端返回的 payment：真实支付参数则唤起微信支付；原型（mock）直接进入下单成功
       const p = o && o.payment
       if (p && !p.mock && p.timeStamp) {
@@ -316,6 +408,20 @@ export default {
   background: var(--c-surface-2);
 }
 .pd-head { margin-top: -16px; position: relative; z-index: 2; }
+.addr-card { margin-top: 12px; }
+.addr-ic {
+  width: 34px; height: 34px; border-radius: 11px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--c-primary-l);
+}
+.addr-ic--warn { background: #FCF3E0; }
+.addr-name { font-size: 14px; font-weight: 700; }
+.addr-phone { font-size: 12px; color: var(--c-ink-3); }
+.addr-text {
+  display: block; margin-top: 3px; font-size: 12px; line-height: 1.55;
+  color: var(--c-ink-3); word-break: break-all;
+}
+.addr-add { min-height: 44px; min-width: 76px; flex: none; }
 .pd-price { align-items: baseline; gap: 8px; }
 .pd-cur { font-size: 14px; color: var(--c-accent-d); font-weight: 700; }
 .pd-num {

@@ -41,6 +41,26 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/orders/orders",
+      "style": {
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true,
+        "backgroundTextStyle": "dark"
+      }
+    },
+    {
+      "path": "pages/order-detail/order-detail",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/address/address",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/address-edit/address-edit",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/login/login",
       "style": { "navigationStyle": "custom" }
     }

@@ -159,6 +159,16 @@ const Api = {
     return call('/user/orders', {})
   },
 
+  /* GET /api/user/orders/:orderNo -> { order } */
+  async fetchOrderDetail(orderNo) {
+    return call('/user/orders/' + encodeURIComponent(orderNo), {})
+  },
+
+  /* GET /api/user/orders/:orderNo/logistics -> { company, no, phone, deliveryType, shippedAt } */
+  async fetchOrderLogistics(orderNo) {
+    return call('/user/orders/' + encodeURIComponent(orderNo) + '/logistics', {})
+  },
+
   /* GET /api/user/comments -> [comments] */
   async fetchMyComments() {
     return call('/user/comments', {})
@@ -220,6 +230,37 @@ const Api = {
       method: 'POST',
       data: { province: loc.province, city: loc.city, district: loc.district }
     })
+  },
+
+  /* ---- 收货地址 ---- */
+  /* GET /api/user/addresses -> [addresses] */
+  async fetchAddresses() {
+    return call('/user/addresses', {})
+  },
+
+  /* GET /api/user/addresses/:id -> { address } */
+  async fetchAddress(id) {
+    return call('/user/addresses/' + encodeURIComponent(id), {})
+  },
+
+  /* POST /api/user/addresses -> { address } */
+  async createAddress(payload) {
+    return call('/user/addresses', { method: 'POST', data: payload })
+  },
+
+  /* PUT /api/user/addresses/:id -> { address } */
+  async updateAddress(id, payload) {
+    return call('/user/addresses/' + encodeURIComponent(id), { method: 'PUT', data: payload })
+  },
+
+  /* POST /api/user/addresses/:id/default -> { address } */
+  async setDefaultAddress(id) {
+    return call('/user/addresses/' + encodeURIComponent(id) + '/default', { method: 'POST' })
+  },
+
+  /* DELETE /api/user/addresses/:id */
+  async deleteAddress(id) {
+    return call('/user/addresses/' + encodeURIComponent(id), { method: 'DELETE' })
   }
 }
 
