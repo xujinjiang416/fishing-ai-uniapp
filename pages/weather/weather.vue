@@ -1,10 +1,12 @@
 <template>
+  <!-- 区块：页面根容器 / app-main 预留底部 tabbar，浮层组件挂在最外层 -->
   <view class="app">
     <view class="app-main">
+      <!-- 区块：顶部导航 / 标题 + 右侧「切换位置」，返回由 AppBar 处理 -->
       <AppBar title="钓鱼天气" back right="切换位置" @right="openLocation" />
 
       <view class="page">
-        <!-- 位置 -->
+        <!-- 区块：位置卡 / 展示当前省市区与定位详情，整卡可点击切换位置 -->
         <view class="card card--pad mt12 loc-card" @click="openLocation">
           <view class="row" style="gap: 10px; min-width: 0; align-items: center">
             <view class="cell__icon"><AppIcon name="crosshair" :size="18" color="#0A6A6C" /></view>
@@ -16,7 +18,7 @@
           <AppIcon name="chevron-right" :size="18" color="#9AA9A7" />
         </view>
 
-        <!-- 日期切换：今天 / 明天 / 后天 -->
+        <!-- 区块：日期切换 / 今天、明天、后天三档，切换即重新拉取对应日期数据 -->
         <view class="day-tabs mt12">
           <view
             v-for="(d, i) in days"
@@ -30,7 +32,7 @@
           </view>
         </view>
 
-        <!-- 加载骨架 -->
+        <!-- 区块：加载骨架 / 实况卡 + 三列指标 + 海报的等高占位，减少数据回填时的布局跳动 -->
         <template v-if="loading">
           <view class="skel mt16" style="height: 150px; border-radius: 22px"></view>
           <view class="grid3 mt16">
@@ -42,7 +44,7 @@
         </template>
 
         <template v-else>
-          <!-- 未开通会员提示（已移除看广告 / ¥1.99 解锁） -->
+          <!-- 区块：未开通会员遮罩 / 结果已生成但锁定，只展示开通入口（已移除看广告 / ¥1.99 解锁），下方内容整体模糊（lock-blur） -->
           <view v-if="locked" class="card card--pad mt12 reveal" style="text-align: center; --d: 0">
             <view class="icon-badge" style="width: 48px; height: 48px; margin: 0 auto 10px; background: var(--c-primary-l)">
               <AppIcon name="lock" :size="22" color="#0A6A6C" />
@@ -55,8 +57,9 @@
             </view>
           </view>
 
+          <!-- 区块：结果主体 / 非会员时加 lock-blur 模糊，但不阻断页面滚动 -->
           <view :class="{ 'lock-blur': locked }">
-            <!-- 当前实况 -->
+            <!-- 区块：当前实况卡 / 天气状况、体感与水温、更新时间、温度区间、日出日落与气压 -->
             <view class="card card--pad mt12 reveal" style="--d: 0">
               <view class="row row--between" style="align-items: flex-start">
                 <view class="row" style="gap: 12px">
@@ -93,7 +96,7 @@
               </view>
             </view>
 
-            <!-- 气象要素 -->
+            <!-- 区块：气象要素 / 影响鱼口的关键指标，按 2 列 + 3 列多段分组展示 -->
             <view class="section">
               <view class="section__head">
                 <view class="section__title"><text>气象要素</text></view>
@@ -113,7 +116,7 @@
                 </view>
               </view>
 
-              <!-- 气压趋势小图 -->
+              <!-- 区块：气压趋势小图 / 柱高按 6 小时序列归一化，最后一根用强调色标「当前」 -->
               <view class="card card--pad mt12 reveal" style="--d: 1">
                 <view class="row row--between">
                   <view class="row" style="gap: 6px">
@@ -208,7 +211,7 @@
               </view>
             </view>
 
-            <!-- 渔获海报 -->
+            <!-- 区块：渔获海报 / 海报组件 + 保存、分享两个模拟操作 -->
             <view class="section">
               <view class="section__head">
                 <view class="section__title"><text>渔获海报</text></view>
@@ -230,7 +233,7 @@
               </view>
             </view>
 
-            <!-- 鱼情评分（基于真实天气 + 大模型研判） -->
+            <!-- 区块：鱼情评分 / 总分环 + 四维进度条 + 适宜鱼种 + 总体依据；数据来自大模型或规则兜底 -->
             <view class="section">
               <view class="section__head">
                 <view class="section__title"><text>鱼情评分</text></view>
@@ -241,7 +244,7 @@
               </view>
 
               <view class="card card--pad">
-                <!-- 总分 -->
+                <!-- 总分：大号分数 + 等级标签 + AI 建议；右侧环形进度由 CSS 变量 p 控制 -->
                 <view class="score-hero">
                   <view class="grow">
                     <view class="row" style="gap: 8px; align-items: baseline">
@@ -254,7 +257,7 @@
                   <view class="score-ring" :style="'--p:' + verdictScore"></view>
                 </view>
 
-                <!-- 四维打分 -->
+                <!-- 四维打分：每维一条进度条 + 简短理由 -->
                 <view class="hr mt12"></view>
                 <view v-for="d in dimensions" :key="d.key" class="dim">
                   <view class="row row--between">
@@ -267,7 +270,7 @@
                   <text class="tiny dim__reason">{{ d.reason }}</text>
                 </view>
 
-                <!-- 适宜鱼种 + 总体依据 -->
+                <!-- 适宜鱼种：标签列表；总体依据：info 提示条（两者为空时不渲染） -->
                 <view v-if="species.length" class="row mt12" style="gap: 6px; flex-wrap: wrap; align-items: center">
                   <text class="tiny" style="color: var(--c-ink-3)">适宜鱼种</text>
                   <text v-for="s in species" :key="s" class="tag tag--primary">{{ s }}</text>
@@ -279,7 +282,7 @@
               </view>
             </view>
 
-            <!-- 全天时段 -->
+            <!-- 区块：全天时段口型 / 横向滚动时段轴，nowIdx 高亮当前时段（未来日期为 -1） -->
             <view class="section">
               <view class="section__head">
                 <view class="section__title"><text>全天时段口型</text></view>
@@ -288,7 +291,7 @@
               <SlotAxis :slots="SLOTS" :nowIdx="nowIdx" />
             </view>
 
-            <!-- AI 建议 -->
+            <!-- 区块：AI 出钓建议 / 固定 7 条建议模板，其中风向、水温、温差等取自实时天气 -->
             <view class="section">
               <view class="section__head">
                 <view class="section__title"><text>AI 出钓建议</text></view>
@@ -312,6 +315,7 @@
               </view>
             </view>
 
+            <!-- 区块：底部引导按钮 / 跳转附近野塘（同样需会员鉴权） -->
             <view class="mt16">
               <view class="btn btn--primary btn--block btn--lg" @click="goSpots">
                 <AppIcon name="map-pin" :size="18" color="#FFFFFF" />
@@ -320,6 +324,7 @@
             </view>
           </view>
 
+          <!-- 区块：页脚说明 / 免责声明与演示标识，底部留白避开 tabbar -->
           <view class="mt16" style="text-align: center; padding-bottom: 8px">
             <text class="tiny" style="display: block">数据由大模型与气象源联合生成，仅供出钓参考</text>
             <text class="tiny mt4" style="color: var(--c-ink-4); display: block">渔获 AI · 原型演示，不产生真实交易与扣款</text>
@@ -334,6 +339,20 @@
 </template>
 
 <script>
+/* 钓鱼天气页
+ *
+ * 职责：按「省市区 + 日期」展示天气实况、气象要素、渔获海报、鱼情评分、时段轴与出钓建议。
+ * props/emits：页面级组件，无 props、无 emits。
+ * 数据来源：Api.fetchWeather({ place, placeDetail, date }) → { weather, verdict, slots }；
+ *           位置与会员态来自 Store；解锁弹窗走 ui.requireUnlock。
+ * 关键状态：
+ *   - W / V / SLOTS：天气实况、研判结论、全天时段；
+ *   - dayIdx：0 今天 / 1 明天 / 2 后天；
+ *   - nowIdx：当前时段下标，仅「今天」生效；
+ *   - locked：非会员时为 true，主体加 lock-blur 并顶部展示开通引导。
+ * 关键交互：切换日期重新拉请求；点击位置卡或右上角切换省市区；开通会员成功后重新加载。
+ * 注意：页面为长列表结构，海报与评分均依赖 W/V，二者需保证同一接口同批返回。
+ */
 import AppBar from '../../components/AppBar.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import AppTabBar from '../../components/AppTabBar.vue'
@@ -346,7 +365,9 @@ import { nowSlotIndex, ymd } from '../../common/utils.js'
 import * as ui from '../../common/ui.js'
 import { nav } from '../../common/nav.js'
 
+/* 近 6 小时气压序列（由远及近），用于绘制气压趋势柱状图 */
 const PRESSURE_6H = [1015.4, 1016.2, 1016.9, 1017.6, 1018.1, 1018.6]
+/* 日期切换标签：索引即 dayIdx（0 今天 / 1 明天 / 2 后天） */
 const DAY_TABS = ['今天', '明天', '后天']
 
 /** 第 i 天的日期对象：0 今天 / 1 明天 / 2 后天 */
@@ -355,6 +376,7 @@ function dayAt(i) {
   d.setDate(d.getDate() + i)
   return d
 }
+/* 月相 → 月龄文案映射；未命中时按亮面百分比折算月龄作为兜底 */
 const MOON_AGE = {
   '新月': '月龄约 0 天', '蛾眉月': '月龄约 4 天', '上弦月': '月龄约 7 天', '盈凸月': '月龄约 11 天',
   '满月': '月龄约 15 天', '亏凸月': '月龄约 19 天', '下弦月': '月龄约 22 天', '残月': '月龄约 26 天'
@@ -363,21 +385,39 @@ const MOON_AGE = {
 export default {
   components: { AppBar, AppIcon, AppTabBar, AppOverlays, CatchPoster, SlotAxis },
   data() {
+    // loading 加载态；W 天气实况；V 研判结论；SLOTS 全天时段；nowIdx 当前时段下标；dayIdx 选中日期
     return { loading: true, W: {}, V: {}, SLOTS: [], nowIdx: 0, dayIdx: 0 }
   },
   computed: {
+    /**
+     * 三个日期选项
+     * @returns {Array<{label: String, date: String, md: String}>}
+     *          date 为 'YYYY-MM-DD'（请求参数），md 为 'M/D'（展示用）
+     */
     days() {
       return DAY_TABS.map((label, i) => {
         const d = dayAt(i)
         return { label, date: ymd(d), md: d.getMonth() + 1 + '/' + d.getDate() }
       })
     },
+    /** 是否锁定：非会员即锁定（当前所有内容均属 weather 功能） */
     locked() { return !Store.isUnlocked('weather') },
+    /**
+     * 位置整行文案
+     * @returns {String} 形如「浙江省 杭州市 西湖区」
+     */
     locLine() {
       const l = Store.location
       return l.province + ' ' + l.city + ' ' + l.district
     },
+    /** 气压是否处于上升趋势（决定趋势标签的文案与配色） */
     pressureUp() { return this.W.pressureTrend === 'up' },
+    /**
+     * 气压柱状图的每根柱子
+     * 算法：以 6 小时序列的最小值为 0 基线、最大值归一化，
+     *       柱高映射到 32%~98%；越靠后透明度越高，最后一根标记为 last（当前）。
+     * @returns {Array<{h: Number, opacity: Number, last: Boolean}>} h 为百分比高度
+     */
     pressureBars() {
       const vals = PRESSURE_6H
       const min = Math.min.apply(null, vals)
@@ -389,6 +429,10 @@ export default {
         last: i === vals.length - 1
       }))
     },
+    /**
+     * 气象要素第一组（2 列）：气压（含趋势文案与涨跌配色）、风向风力
+     * @returns {Array<{ic, k, v, u, color, hint}>}
+     */
     metricsTop() {
       const W = this.W
       const upColor = W.pressureTrend === 'up' ? 'var(--c-success)' : (W.pressureTrend === 'down' ? 'var(--c-danger)' : 'inherit')
@@ -400,6 +444,10 @@ export default {
         { ic: 'wind', k: '风向 · 风力', v: W.windDir, u: ' ' + W.windLevel, hint: '风速 ' + W.windSpeed + ' m/s' }
       ]
     },
+    /**
+     * 气象要素第二组（3 列）：湿度、云量、降水概率（≥60% 高亮警示色）
+     * @returns {Array<{ic, k, v, u, color?}>}
+     */
     metricsMid() {
       const W = this.W
       const rainColor = W.rainProb >= 60 ? 'var(--c-warn)' : ''
@@ -409,6 +457,10 @@ export default {
         { ic: 'cloud-rain', k: '降水概率', v: W.rainProb, u: '%', color: rainColor }
       ]
     },
+    /**
+     * 气象要素第三组（3 列）：紫外线（0-2 弱 … >10 极强）、能见度、空气质量（按 AQI 分段着色）
+     * @returns {Array<{ic, k, v, u, color, hint}>}
+     */
     metricsBottom() {
       const W = this.W
       const uvTxt = W.uv <= 2 ? '弱' : (W.uv <= 5 ? '中等' : (W.uv <= 7 ? '强' : (W.uv <= 10 ? '很强' : '极强')))
@@ -419,6 +471,11 @@ export default {
         { ic: 'waves', k: '空气质量', v: W.aqi, color: aqiColor, hint: 'AQI ' + W.aqiText }
       ]
     },
+    /**
+     * 补充要素（2 列）：月相（附月龄与亮面）与日出日落
+     * 月龄优先查 MOON_AGE 映射，缺失时按 moonIllum 折算（29.5 天周期）。
+     * @returns {Array<{ic, k, v, hint?}>}
+     */
     metricsExtra() {
       const W = this.W
       const moonAge = MOON_AGE[W.moonPhase] || ('月龄约 ' + Math.round(W.moonIllum / 100 * 29.5) + ' 天')
@@ -428,10 +485,17 @@ export default {
       ]
     },
     // ---- 鱼情评分（由后端真实天气 + 大模型/规则引擎生成）----
+    /** 总分，缺失时按 0 处理 */
     verdictScore() { return this.V.score != null ? this.V.score : 0 },
+    /** 评分等级名称（如「狂口」），缺失时显示占位符 */
     verdictLevel() { return this.V.name || '—' },
+    /** 是否由大模型生成（false 表示规则引擎兜底），用于标题右侧标注 */
     aiGenerated() { return !!this.V.aiGenerated },
     // 评分维度（含进度条百分比），旧缓存无该字段时回退空数组
+    /**
+     * 四维评分列表
+     * @returns {Array<{key, name, score, reason, pct}>} pct 已限制在 0~100 用于进度条宽度
+     */
     dimensions() {
       return (this.V.dimensions || []).map(d => ({
         key: d.key,
@@ -441,10 +505,17 @@ export default {
         pct: Math.max(0, Math.min(100, d.score || 0))
       }))
     },
+    /** 适宜鱼种列表 */
     species() { return this.V.species || [] },
+    /** 总体研判依据（info 提示条） */
     verdictReason() { return this.V.reason || '' },
+    /** AI 出钓建议正文（评分卡内短句） */
     verdictAdvice() { return this.V.advice || '' },
     // 按总分取标签色调（与鱼情等级联动）
+    /**
+     * 分数段对应的标签配色类
+     * @returns {String} ≥88 gold / ≥72 success / ≥58 accent / 其余 mute
+     */
     scoreTone() {
       const s = this.verdictScore
       if (s >= 88) return 'tag--gold'
@@ -452,6 +523,11 @@ export default {
       if (s >= 58) return 'tag--accent'
       return 'tag--mute'
     },
+    /**
+     * AI 出钓建议清单（7 条：钓位 / 钓法 / 饵料 / 线组 / 窗口 / 避让 / 注意）
+     * 其中风向、水温、黄金窗口与温差取自 W，其余为固定文案模板。
+     * @returns {Array<{ic: String, t: String, d: String}>}
+     */
     tips() {
       const W = this.W
       return [
@@ -466,12 +542,19 @@ export default {
     }
   },
   onLoad() {
+    // 首次进入即拉取「今天」的数据
     this.load()
   },
   onUnload() {
     // 离开页面时回退路由栈（由 AppBar 处理），此处无需额外清理
   },
   methods: {
+    /**
+     * 拉取所选日期的天气与研判
+     * 分步：① 置加载态并重置 nowIdx；② 用 Store 位置 + 当前日期拼参数；
+     *       ③ 校验返回；④ 回填 W/V/SLOTS；⑤ 仅「今天」计算当前时段下标，未来日期置 -1。
+     * @returns {void}
+     */
     load() {
       this.loading = true
       this.nowIdx = 0
@@ -490,16 +573,34 @@ export default {
         this.loading = false
       })
     },
+    /**
+     * 切换日期：同一天点击忽略，否则更新索引并重新加载
+     * @param {Number} i 0 今天 / 1 明天 / 2 后天
+     * @returns {void}
+     */
     pickDay(i) {
       if (i === this.dayIdx) return
       this.dayIdx = i
       this.load()
     },
+    /**
+     * 站内跳转（统一走 nav）
+     * @param {String} url 目标页面
+     * @returns {void}
+     */
     go(url) { nav(url) },
+    /**
+     * 打开位置选择弹层，关闭后按新位置重新加载
+     * @returns {Promise<void>}
+     */
     async openLocation() {
       await ui.locationSheet()
       this.load()
     },
+    /**
+     * 开通会员引导：弹套餐选择，选择后跳会员页；返回 true（已是会员）则重新加载解锁内容
+     * @returns {Promise<void>}
+     */
     async unlock() {
       const ok = await ui.requireUnlock({
         feature: 'weather',
@@ -509,12 +610,24 @@ export default {
       })
       if (ok) this.load()
     },
+    /**
+     * 保存海报（原型阶段仅 toast 提示，真实版下载到相册）
+     * @returns {void}
+     */
     savePoster() {
       ui.toast('原型演示：真实版将把海报保存到手机相册', 'download')
     },
+    /**
+     * 分享海报（原型阶段仅 toast 提示，真实版生成分享图并唤起微信）
+     * @returns {void}
+     */
     sharePoster() {
       ui.toast('原型演示：真实版将生成分享图并唤起微信分享', 'share')
     },
+    /**
+     * 跳转附近野塘（需 spots 功能鉴权）
+     * @returns {Promise<void>}
+     */
     async goSpots() {
       const ok = await ui.requireUnlock({
         feature: 'spots',
@@ -529,7 +642,10 @@ export default {
 </script>
 
 <style>
+/* 页面级局部样式：仅覆盖天气页特有元素，卡片 / 网格 / 按钮等通用样式来自全局设计系统 */
+/* 位置卡：左右两端对齐，中间文本区可省略（ellipsis），保证长地名不撑破 */
 .loc-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+/* 日期切换：三档等宽平分，选中态换主色底与主色边框 */
 .day-tabs { display: flex; gap: 8px; }
 .day-tab {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px;
@@ -547,9 +663,11 @@ export default {
 .unlock-title { display: block; font-family: var(--font-display); font-size: 17px; font-weight: 700; }
 
 /* ---- 鱼情评分 ---- */
+/* 总分行：左侧文字与右侧圆环两端对齐 */
 .score-hero { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .score-num { font-family: var(--font-display); font-size: 44px; font-weight: 700; line-height: 1; color: var(--c-ink); }
 .score-max { font-size: 13px; color: var(--c-ink-4); }
+/* 环形评分：conic-gradient 按 --p（0~100 分）填充强调色，::after 挖空中心形成圆环 */
 .score-ring {
   width: 54px; height: 54px; border-radius: 50%; flex: none;
   background: conic-gradient(var(--c-accent) calc(var(--p, 0) * 1%), var(--c-line-soft) 0);

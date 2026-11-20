@@ -1,13 +1,16 @@
 /* uni.scss —— 全局 SCSS 变量（uni-app 自动注入所有组件样式）
  * 设计真源见 App.vue 的 :root / page CSS 变量与 common 层。
  * 此文件只保留少量 scss 变量，避免与 CSS 变量重复维护。
+ *
+ * 说明：这里的变量只在编译期参与 SCSS 计算，不会被输出到运行时样式；
+ * 需要主题切换 / 运行时读取的场景请使用 App.vue 中的 CSS 自定义属性（--c-*）。
  */
-$c-primary: #0F8B8D;
-$c-primary-dark: #0A6A6C;
-$c-accent: #FF7A3D;
-$c-gold: #C08A2E;
-$c-ink: #12211F;
-$c-ink-3: #6E807E;
-$c-bg: #F4F7F6;
-$app-w: 430px;
-$tabbar-h: 64px;
+$c-primary: #0F8B8D;        // 品牌主色（湖水青）
+$c-primary-dark: #0A6A6C;   // 主色深色态，用于主色文字 / 按压态
+$c-accent: #FF7A3D;         // 强调色（日出橙），用于关键 CTA / 提示
+$c-gold: #C08A2E;           // 会员金，用于会员标识 / 付费相关
+$c-ink: #12211F;            // 主文字色（近黑墨绿）
+$c-ink-3: #6E807E;          // 次级 / 辅助文字色
+$c-bg: #F4F7F6;             // 页面背景色（浅雾绿）
+$app-w: 430px;              // 应用内容最大宽度（居中约束，模拟手机画幅）
+$tabbar-h: 64px;            // 自定义底部 TabBar 高度（不含安全区）

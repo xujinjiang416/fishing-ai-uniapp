@@ -1,7 +1,7 @@
 <template>
   <view class="app">
     <view class="app-main">
-      <!-- 加载骨架 -->
+      <!-- 区块：加载骨架 / 头图 + 信息卡 + 两行列表的占位 / 仅在 loading 时展示，避免首屏白闪 -->
       <view v-if="loading" class="page" style="padding-top: 6px">
         <view class="skel" style="height: 260px; border-radius: 0; margin: 0 -16px"></view>
         <view class="skel mt16" style="height: 118px; border-radius: 22px"></view>
@@ -15,7 +15,7 @@
       </view>
 
       <template v-else>
-        <!-- 封面实景提示 -->
+        <!-- 区块：封面来源提示 / 通栏通知条 / 仅在封面取自评论或暂无实景图时出现 -->
         <view v-if="coverNotice" style="padding: 12px 16px 0">
           <view class="notice notice--info">
             <AppIcon :name="coverNoticeIcon" :size="15" color="#0A6A6C" />
@@ -23,7 +23,7 @@
           </view>
         </view>
 
-        <!-- 图集 -->
+        <!-- 区块：图集 / 顶部大图 + 底部缩略图横滑切换 / 无图时走占位块；返回按钮悬浮于图上层 -->
         <view class="hero-wrap">
           <view class="gallery-hero">
             <image v-if="heroImg" class="gallery-hero__img" :src="heroImg" mode="aspectFill" @click="previewImage(gi)" />
@@ -53,7 +53,7 @@
         </view>
 
         <view class="page" style="padding-top: 14px">
-          <!-- 基本信息 -->
+          <!-- 区块：基本信息卡 / 标题与评分 + 收藏按钮 + 标签行 + 三项指标网格 / 收藏为本地即时态 -->
           <view class="card card--pad reveal" style="--d: 0">
             <view class="row row--between" style="align-items: flex-start; gap: 10px">
               <view class="grow">
@@ -103,7 +103,7 @@
             </view>
           </view>
 
-          <!-- 位置与导航 -->
+          <!-- 区块：位置与导航 / 地址与坐标文本 + 复制、导航两个等宽按钮 / 坐标与地址拼接后写入剪贴板 -->
           <view class="section">
             <view class="section__head">
               <view class="section__title"><text>位置与导航</text></view>
@@ -130,7 +130,7 @@
             </view>
           </view>
 
-          <!-- 注意事项 -->
+          <!-- 区块：注意事项 / 单卡片文本块 / 后端 note 为空时整块不渲染 -->
           <view v-if="S.note" class="card card--pad reveal mt12">
             <view class="card__title">
               <AppIcon name="alert-triangle" :size="16" color="#12211F" />
@@ -139,7 +139,7 @@
             <text class="muted mt8" style="line-height: 1.7; display: block">{{ S.note }}</text>
           </view>
 
-          <!-- 今日鱼情 -->
+          <!-- 区块：今日鱼情入口 / 天气摘要卡 + 解锁按钮 / 非会员点击先走会员校验 -->
           <view class="section">
             <view class="card card--pad reveal">
               <view class="row" style="gap: 12px">
@@ -159,7 +159,7 @@
             </view>
           </view>
 
-          <!-- 相似钓点 -->
+          <!-- 区块：相似钓点推荐 / 横向 scroll-view 卡片流 / 无相似数据时整块隐藏 -->
           <view v-if="similar.length" class="section">
             <view class="section__head">
               <view class="section__title"><text>相似钓点推荐</text></view>
@@ -191,7 +191,7 @@
             </scroll-view>
           </view>
 
-          <!-- 钓友评价 -->
+          <!-- 区块：钓友评价 / 评分汇总 + 发布入口 + 评论列表（含实景图与点赞） / 无评论时展示空态 -->
           <view class="section">
             <view class="section__head">
               <view class="section__title"><text>钓友评价</text></view>
@@ -252,6 +252,7 @@
             </view>
           </view>
 
+          <!-- 区块：页脚说明 / 居中免责声明 / 预留底部安全间距，避免被标签栏遮挡 -->
           <view class="mt24" style="text-align: center; padding-bottom: 8px">
             <text class="tiny" style="display: block">渔获 AI · 钓点信息由钓友共建，仅供出钓参考</text>
             <text class="tiny mt4" style="color: var(--c-ink-4); display: block">原型演示 · 不产生真实交易</text>
@@ -260,7 +261,7 @@
       </template>
     </view>
 
-    <!-- 发表评价弹层 -->
+    <!-- 区块：发表评价弹层 / 遮罩 + 底部抽屉 / 关闭仅重置显隐，表单值在提交成功后清空 -->
     <template v-if="publishOpen">
       <view class="mask" @click="publishOpen = false"></view>
       <view class="sheet">
@@ -309,12 +310,19 @@
       </view>
     </template>
 
+    <!-- 全局：底部标签栏 + 全局浮层（登录/解锁/弹窗），固定在页面根节点末尾 -->
     <AppTabBar page="spot-detail" />
     <AppOverlays />
   </view>
 </template>
 
 <script>
+/* 钓点详情页
+ * 路由参数：id —— 钓点 ID（缺省 's1'）
+ * 数据接口：Api.fetchSpot(id) 详情、Api.fetchSpots({}) 相似钓点、Api.toggleFavorite 收藏、Api.postComment 发表评价
+ * 关键交互：图集切换/大图预览、收藏、复制位置、会员解锁天气、发表带图评价、评论点赞
+ * 业务限制：评价正文必填且 ≤300 字、实景图 ≤3 张；该塘无实景图时，后端以首条评论图作为封面
+ */
 import AppBar from '../../components/AppBar.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import AppTabBar from '../../components/AppTabBar.vue'
@@ -330,31 +338,43 @@ export default {
   components: { AppBar, AppIcon, AppTabBar, AppOverlays, Rating },
   data() {
     return {
-      loading: true,
-      spotId: 's1',
-      S: { comments: [], fish: [], gallery: [] },
-      similar: [],
-      gi: 0,
-      likes: {},
-      liked: {},
-      publishOpen: false,
-      rating: 5,
-      text: '',
-      picks: [],
-      submitting: false
+      loading: true, // 首屏骨架开关：请求返回后关闭
+      spotId: 's1', // 钓点 ID，来自路由参数 ?id=，缺省 s1（演示数据）
+      S: { comments: [], fish: [], gallery: [] }, // 钓点详情：名称/评分/评论/距离/鱼种/图集/坐标/注意事项等
+      similar: [], // 相似钓点：排除自身后按距离升序取前 3 条
+      gi: 0, // 当前图集索引，0 表示首图
+      likes: {}, // 评论点赞数缓存 { 评论id: 数量 }
+      liked: {}, // 当前用户点赞态缓存 { 评论id: boolean }
+      publishOpen: false, // 发表评价弹层显隐
+      rating: 5, // 打星评分，取值 1~5
+      text: '', // 评价正文，最长 300 字
+      picks: [], // 待上传实景图临时路径，最多 3 张
+      submitting: false // 发布请求中，防止重复提交
     }
   },
   computed: {
+    /** 图集数据源：优先 gallery，缺省用 cover 兜底，都无则为空数组
+     * @returns {string[]} 可预览的图片地址列表
+     */
     gallery() {
       const S = this.S
       if (S.gallery && S.gallery.length) return S.gallery
       return S.cover ? [S.cover] : []
     },
+    /** 当前大图地址，索引越界时返回空串（模板走占位块）
+     * @returns {string}
+     */
     heroImg() { return this.gallery[this.gi] || '' },
+    /** 封面来源：'comment' 评论实景 / 'none' 无图 / '' 官方实景
+     * @returns {string}
+     */
     coverFrom() {
       if (this.S.coverFrom) return this.S.coverFrom
       return this.S.cover ? '' : 'none'
     },
+    /** 顶部封面提示文案：评论实景时带出 @用户，无图时引导上传，官方实景返回空串不展示
+     * @returns {string}
+     */
     coverNotice() {
       const cf = this.coverFrom
       if (cf === 'comment') {
@@ -369,53 +389,101 @@ export default {
       if (cf === 'none') return '暂无实景图，欢迎上传第一张实景'
       return ''
     },
+    /** 提示图标：无图用相机，其余用图片图标
+     * @returns {string} AppIcon 名称
+     */
     coverNoticeIcon() { return this.coverFrom === 'none' ? 'camera' : 'image' },
+    /** 水深文本：去掉后端返回的「水深」前缀，只留数值部分
+     * @returns {string}
+     */
     waterDepth() { return String(this.S.water || '').replace(/^水深\s*/, '') },
+    /** 收藏状态，来自本地 Store（登录后与后端同步）
+     * @returns {boolean}
+     */
     fav() { return Store.isFavorite(this.S.id) },
+    /** 天气功能是否锁定（非会员即锁定）
+     * @returns {boolean}
+     */
     weatherLocked() { return !Store.isUnlocked('weather') },
+    /** 所有评论所带实景图的总数，用于「实景图 N 张」展示
+     * @returns {number}
+     */
     imgCount() {
       let n = 0
       ;(this.S.comments || []).forEach(c => { if (c.images) n += c.images.length })
       return n
     }
   },
+  /**
+   * 读取路由参数并拉取详情
+   * @param {Object} options 页面参数，options.id 为钓点 ID
+   */
   onLoad(options) {
     this.spotId = (options && options.id) || 's1'
     this.load()
   },
   methods: {
+    /**
+     * 通用页面跳转
+     * @param {string} url 目标页面路径（可带查询串）
+     */
     go(url) { nav(url) },
+    /**
+     * 打开指定钓点详情
+     * @param {string} id 钓点 ID
+     */
     openSpot(id) { nav('/pages/spot-detail/spot-detail?id=' + encodeURIComponent(id)) },
+    /**
+     * 并行加载钓点详情与钓点列表，用列表推导相似钓点
+     * 详情失败：结束骨架并提示；列表失败：仅缺少相似推荐，不影响主内容
+     */
     load() {
       this.loading = true
       Promise.all([Api.fetchSpot(this.spotId), Api.fetchSpots({})]).then(res => {
         if (res[0].code !== 0 || !res[0].data) { this.loading = false; ui.toast(res[0].msg || '钓点加载失败', 'alert-triangle'); return }
         this.S = res[0].data
+        // 相似钓点：排除当前钓点后按距离升序取前 3 条
         const list = (res[1].data || []).filter(x => x.id !== this.S.id)
         list.sort((a, b) => a.dist - b.dist)
         this.similar = list.slice(0, 3)
         this.loading = false
       })
     },
+    /**
+     * 预览图集大图
+     * @param {number} i 起始图片索引
+     */
     previewImage(i) {
       if (!this.gallery.length) return
       uni.previewImage({ urls: this.gallery, current: this.gallery[i] })
     },
+    /**
+     * 预览单条评论的实景图
+     * @param {string[]} images 该评论图片列表
+     * @param {number} i 起始索引
+     */
     previewComment(images, i) {
       uni.previewImage({ urls: images, current: images[i] })
     },
+    /** 切换收藏状态，成功按结果提示，失败保留原状态 */
     toggleFav() {
       Api.toggleFavorite(this.S.id).then(res => {
         if (res.code !== 0) { ui.toast(res.msg || '操作失败，请重试', 'alert-triangle'); return }
         ui.toast(res.data.favorited ? '已收藏该钓点' : '已取消收藏', 'heart')
       })
     },
+    /** 复制「地址 + 坐标」，便于粘贴到第三方地图搜索 */
     copyLoc() {
       ui.copy(this.S.address + ' ' + this.S.coord, '已复制，可粘贴到高德 / 百度 / 腾讯地图导航')
     },
+    /** 唤起导航：原型阶段仅提示，不调起真实地图 App */
     doNav() {
       ui.toast('已唤起地图导航（原型演示）', 'navigation')
     },
+    /**
+     * 评论点赞 / 取消点赞
+     * @param {string} id 评论 ID
+     */
     toggleLike(id) {
       if (this.liked[id]) {
         this.liked[id] = false
@@ -428,6 +496,7 @@ export default {
       this.likes = Object.assign({}, this.likes)
       this.liked = Object.assign({}, this.liked)
     },
+    /** 会员解锁校验：通过后跳转天气页，取消则停留原页 */
     async unlockWeather() {
       const ok = await ui.requireUnlock({
         feature: 'weather',
@@ -437,6 +506,10 @@ export default {
       })
       if (ok) nav('/pages/weather/weather')
     },
+    /**
+     * 选择实景图，按剩余名额（3 - 已选）限制单次可选数量
+     * 用户拒绝相册/相机授权时给出提示
+     */
     addPick() {
       const remain = 3 - this.picks.length
       if (remain <= 0) return
@@ -451,9 +524,17 @@ export default {
         fail: () => ui.toast('请授权相册后再上传图片', 'alert-triangle')
       })
     },
+    /**
+     * 移除指定位置的待上传图片
+     * @param {number} i 图片索引
+     */
     removePick(i) {
       this.picks.splice(i, 1)
     },
+    /**
+     * 发布评价：校验正文非空且未在提交中 → 提交 → 本地插入评论并同步计数
+     * 该塘原本无实景图时，首图会回填为封面（与后端规则保持一致）
+     */
     submit() {
       const text = String(this.text || '').trim()
       if (!text) { ui.toast('请先填写评价内容', 'alert-triangle'); return }
@@ -487,8 +568,10 @@ export default {
 .metric__v--sm { font-size: 14px; }
 .rating-big { font-family: var(--font-display); font-size: 32px; font-weight: 700; line-height: 1; }
 .avatar__t2 { color: #fff; font-weight: 700; font-size: 14px; }
+/* 横滑相似钓点卡片：固定宽度且不参与 flex 收缩，保证卡片等宽排列 */
 .sim-card { width: 152px; flex: none; }
 .sim-card__img { width: 100%; height: 92px; }
 .sim-card__ph { width: 100%; height: 92px; background: var(--grad-water); display: flex; align-items: center; justify-content: center; }
+/* 弹层内文本域：改用二级背景，与抽屉底色区分 */
 .sheet .textarea { background: var(--c-surface-2); }
 </style>

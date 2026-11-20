@@ -1,11 +1,15 @@
 <template>
+  <!-- 区块：登录页根容器 / 竖向三段式：顶部导航、品牌展示、底部表单卡 -->
   <view class="app login">
+    <!-- 装饰：左上角水蓝径向光晕，纯视觉，pointer-events 由样式层关闭 -->
     <view class="login__glow"></view>
 
+    <!-- 区块：顶部导航 / 仅一个返回按钮，用于从其他页跳入后返回 -->
     <view class="login__nav">
       <AppBar back />
     </view>
 
+    <!-- 区块：品牌展示区 / 欢迎语 + 品牌名 + slogan + 头图胶囊标签 -->
     <view class="login__body">
       <text class="login__welcome">欢迎使用</text>
       <text class="login__brand">渔获 AI</text>
@@ -13,6 +17,7 @@
 
       <view class="login__hero">
         <image class="login__hero-img" src="/static/img/lake-hero.jpg" mode="aspectFill" />
+        <!-- 头图角标：半透明深色底 + 白字，保证在浅色湖景上可读 -->
         <view class="login__hero-tag">
           <AppIcon name="waves" :size="12" color="#FFFFFF" />
           <text>实时鱼情 · AI 研判</text>
@@ -20,6 +25,7 @@
       </view>
     </view>
 
+    <!-- 区块：底部表单卡 / 登录与注册共用一套输入，注册时额外显示确认密码 -->
     <view class="login__foot">
       <view class="login__card">
         <!-- 登录 / 注册 切换 -->
@@ -36,6 +42,7 @@
           >注册</text>
         </view>
 
+        <!-- 手机号输入：数字键盘 + 11 位限制，提交前再用正则校验 -->
         <view class="field">
           <input
             class="field__input"
@@ -47,6 +54,7 @@
           />
         </view>
 
+        <!-- 密码输入：6-16 位，密文显示 -->
         <view class="field mt10">
           <input
             class="field__input"
@@ -58,6 +66,7 @@
           />
         </view>
 
+        <!-- 确认密码：仅注册模式渲染，用于二次校验 -->
         <view v-if="mode === 'register'" class="field mt10">
           <input
             class="field__input"
@@ -69,10 +78,12 @@
           />
         </view>
 
+        <!-- 提交按钮：submitting 期间降透明度并按提交中态显示文案（防止重复点击） -->
         <view class="lg-btn" :class="{ 'lg-btn--dim': submitting }" @click="submit">
           <text>{{ submitting ? '处理中…' : (mode === 'register' ? '注册并登录' : '登录') }}</text>
         </view>
 
+        <!-- 协议勾选：圆形勾选框，未勾选时提交会被拦截 -->
         <view class="agree">
           <view class="agree__box" :class="{ 'is-on': agreed }" @click="agreed = !agreed">
             <AppIcon v-if="agreed" name="check" :size="11" color="#FFFFFF" />
@@ -84,14 +95,30 @@
         </view>
       </view>
 
+      <!-- 演示账号提示：仅原型环境使用 -->
       <text class="login__tip">演示账号：13800138000 · 密码 123456</text>
     </view>
 
+    <!-- 区块：全局浮层宿主 / 承载协议弹窗与 toast -->
     <AppOverlays />
   </view>
 </template>
 
 <script>
+/* 登录 / 注册页
+ *
+ * 职责：手机号 + 密码登录，或注册后自动登录。
+ * props/emits：页面级组件，无 props、无 emits。
+ * 数据来源：Api.login(phone, pwd) / Api.register(phone, pwd, confirm)，返回 { code, msg, data: { user } }。
+ * 状态：
+ *   - mode     'login' | 'register'，默认 'login'；
+ *   - phone / password / confirm  输入值（字符串）；
+ *   - agreed   Boolean 是否同意协议，默认 true；
+ *   - submitting Boolean 提交中，防重复请求。
+ * 校验规则：手机号 ^1[3-9]\d{9}$；密码 6-16 位；注册时两次密码需一致；必须勾选协议。
+ * 成功处理：Store.setSession(user) 写登录态 → toast → 返回上一页。
+ * 注意：使用自定义导航（AppBar），页面背景为浅色水蓝，表单卡负责承载所有交互。
+ */
 import AppBar from '../../components/AppBar.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import AppOverlays from '../../components/AppOverlays.vue'
@@ -100,29 +127,48 @@ import Api from '../../common/api.js'
 import * as ui from '../../common/ui.js'
 import { back } from '../../common/nav.js'
 
+/* 手机号校验：1 开头 + 3-9 号段 + 9 位数字，共 11 位 */
 const PHONE_RE = /^1[3-9]\d{9}$/
+/* 密码长度下限（含） */
 const PWD_MIN = 6
+/* 密码长度上限（含） */
 const PWD_MAX = 16
 
 export default {
   components: { AppBar, AppIcon, AppOverlays },
   data() {
     return {
+      // 当前表单模式：登录或注册，切换时清空密码类输入
       mode: 'login', // 'login' | 'register'
+      // 手机号原始输入（提交前会去空格并校验）
       phone: '',
+      // 登录 / 注册密码
       password: '',
+      // 确认密码，仅注册模式使用
       confirm: '',
+      // 是否已勾选用户协议与隐私协议，默认已勾选
       agreed: true,
+      // 请求进行中标记，用于按钮置灰与防重复提交
       submitting: false
     }
   },
   methods: {
+    /**
+     * 切换登录 / 注册模式；同模式点击直接忽略，切换时清空密码避免误带
+     * @param {String} m 'login' | 'register'
+     * @returns {void}
+     */
     switchMode(m) {
       if (this.mode === m) return
       this.mode = m
       this.password = ''
       this.confirm = ''
     },
+    /**
+     * 提交前的本地校验（顺序：手机号 → 密码长度 → 确认密码 → 协议）
+     * 任一不通过即 toast 提示并中断，全部通过后进入异步提交
+     * @returns {void}
+     */
     submit() {
       const phone = String(this.phone || '').replace(/\s/g, '')
       if (!PHONE_RE.test(phone)) {
@@ -145,6 +191,15 @@ export default {
       }
       this.doSubmit(phone, pwd, confirm)
     },
+    /**
+     * 调用登录 / 注册接口并落地会话
+     * 分步：① 防重复提交；② 按 mode 选择接口；③ 失败 toast 并结束；
+     *       ④ 成功写入登录态、提示、返回上一页。
+     * @param {String} phone   已校验的手机号
+     * @param {String} pwd     已校验的密码
+     * @param {String} confirm 确认密码（仅注册接口使用）
+     * @returns {Promise<void>}
+     */
     async doSubmit(phone, pwd, confirm) {
       if (this.submitting) return
       this.submitting = true
@@ -160,6 +215,11 @@ export default {
       ui.toast(isReg ? '注册成功，已自动登录' : '登录成功', 'circle-check')
       back()
     },
+    /**
+     * 查看用户协议 / 隐私协议：用全局模态展示演示版文本
+     * @param {String} kind 'user' 用户协议 | 'privacy' 隐私协议
+     * @returns {void}
+     */
     openDoc(kind) {
       const isUser = kind === 'user'
       ui.openModal({
@@ -184,6 +244,7 @@ export default {
   background: var(--c-bg);
   overflow: hidden;
 }
+/* 页面背景光晕：绝对定位铺在内容之下，pointer-events:none 避免遮挡点击 */
 .login__glow {
   position: absolute;
   left: -25%;
@@ -219,6 +280,7 @@ export default {
   letter-spacing: 1px;
   color: var(--c-ink-3);
 }
+/* 头图：max-width 350px 约束大屏高度，overflow:hidden 配合圆角裁切 */
 .login__hero {
   position: relative;
   width: 100%;
@@ -246,6 +308,7 @@ export default {
   color: #FFFFFF;
 }
 
+/* 底部表单区：左右 20px、底部 26px 留白，避免贴住系统手势区 */
 .login__foot { position: relative; padding: 0 20px 26px; }
 .login__card {
   background: var(--c-surface);
@@ -306,6 +369,7 @@ export default {
 }
 .lg-btn--dim { opacity: .55; box-shadow: none; }
 
+/* 协议行：flex-wrap 允许窄屏折行，整体居中 */
 .agree {
   display: flex;
   flex-direction: row;

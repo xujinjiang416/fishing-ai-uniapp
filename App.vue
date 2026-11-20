@@ -1,13 +1,34 @@
+<!--
+  App.vue —— 应用根组件
+  · 运行环境：微信小程序 / App / H5（uni-app 多端编译）
+  · 组件职责：只做两件事——承载全局设计系统样式、提供应用级生命周期钩子；
+    不渲染任何业务 UI（模板内 .app-root 为空占位）。
+  · 全局标识：本文件的样式区是全站唯一的设计 token 与公共组件类真源，
+    所有页面复用其中的 CSS 变量与类名，禁止自创色值 / 字号 / 圆角。
+  · 依赖：common 目录下的状态与请求模块在页面首次 import 时自行初始化，无需在此显式调用。
+-->
 <template>
+  <!-- 根占位节点：仅作为样式作用域与页面容器的锚点，无实际内容 -->
   <view class="app-root"></view>
 </template>
 
 <script>
+/**
+ * 应用根组件选项对象
+ * 生命周期由 uni-app 运行时调用，与 Vue 的 mounted 不同，按“应用前后台”维度触发。
+ */
 export default {
+  /**
+   * 应用启动（全局仅触发一次）：适合放登录态校验、全局配置预拉取等一次性初始化。
+   * 当前实现为空——数据层（Store / api）在各页面首次引入 common 模块时完成初始化，
+   * 避免启动阶段阻塞首屏渲染。
+   */
   onLaunch() {
     // 应用启动：数据层（Store/mock/api）在 common 模块首次引入时完成初始化
   },
+  /** 应用进入前台（含首次启动后）：当前无额外处理 */
   onShow() {},
+  /** 应用切到后台：当前无额外处理（如需埋点 / 心跳暂停可在此扩展） */
   onHide() {}
 }
 </script>
@@ -20,8 +41,12 @@ export default {
    所有页面必须复用本文件中的 token 与组件类，禁止自创色值 / 字号 / 圆角。
    ========================================================================== */
 
-/* ---------- 1. Tokens（挂在根容器 .app 上，向后代继承） ---------- */
+/* ---------- 1. Tokens（挂在根容器 .app 上，向后代继承） ----------
+ * 分组：主题色 → 渐变 → 字体 → 圆角/阴影 → 布局尺寸。
+ * 小程序端根节点无法用 :root，故一律挂在 .app 容器，页面需保证最外层带 .app 类。
+ */
 .app {
+  /* 主题色：主色(湖水青) / 强调色(日出橙) / 会员金 / 文字墨色 4 级 / 背景与描边 / 语义状态色 */
   --c-primary: #0F8B8D;
   --c-primary-d: #0A6A6C;
   --c-primary-l: #E5F4F4;
@@ -43,20 +68,24 @@ export default {
   --c-warn: #D9971A;
   --c-danger: #E5484D;
 
+  /* 品牌渐变：水面(主按钮) / 晨光(强调) / 金质(会员) / 图片底部渐隐遮罩 */
   --grad-water: linear-gradient(160deg, #128E90 0%, #0B5F72 100%);
   --grad-dawn: linear-gradient(135deg, #FFB06B 0%, #FF7A3D 100%);
   --grad-gold: linear-gradient(135deg, #E3B25E 0%, #C08A2E 100%);
   --grad-fade: linear-gradient(180deg, rgba(18,33,31,0) 0%, rgba(9,32,36,.82) 100%);
 
+  /* 字体：display 用于标题(宋体气质) / body 用于正文(系统无衬线) / mono 用于数字与时间 */
   --font-display: "Noto Serif SC", "Songti SC", "STSong", Georgia, serif;
   --font-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif;
   --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 
+  /* 圆角梯度 r-xs→r-xl，r-pill 为胶囊；阴影 sm→lg 对应卡片/浮层/弹窗层级 */
   --r-xs: 8px; --r-sm: 12px; --r-md: 16px; --r-lg: 22px; --r-xl: 28px; --r-pill: 999px;
   --sh-sm: 0 1px 2px rgba(18,33,31,.05), 0 1px 3px rgba(18,33,31,.04);
   --sh-md: 0 6px 20px rgba(11,95,114,.08);
   --sh-lg: 0 16px 40px rgba(11,95,114,.16);
 
+  /* 布局尺寸：底部 TabBar 高度、内容最大宽度(居中限宽) */
   --tabbar-h: 64px;
   --app-w: 430px;
 

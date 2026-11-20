@@ -3,7 +3,7 @@
     <view class="app-main">
       <AppBar title="商品详情" back />
 
-      <!-- 加载骨架 -->
+      <!-- 区块：加载骨架 / 主图 + 两行文本 + 详情卡占位 / G 为 null 即展示，防止首屏空白 -->
       <view v-if="!G" class="page" style="padding-top: 8px">
         <view class="skel" style="width: 100%; height: 340px; border-radius: var(--r-lg)"></view>
         <view class="skel mt16" style="height: 20px; width: 60%"></view>
@@ -12,11 +12,11 @@
       </view>
 
       <template v-else>
-        <!-- 主图 -->
+        <!-- 区块：商品主图 / 通栏 340px 定高切图 / 无图时由占位背景兜底 -->
         <image class="pd-hero" :src="G.img" mode="aspectFill" />
 
         <view class="page">
-          <!-- 价格 / 标题 -->
+          <!-- 区块：价格与标题 / 现价 + 划线原价 + 立省标签 + 标签行 + 销量库存 / 负 margin 上移覆盖主图 -->
           <view class="card card--pad pd-head">
             <view class="row pd-price">
               <text class="pd-cur">¥</text>
@@ -40,7 +40,7 @@
             </view>
           </view>
 
-          <!-- 收货地址（支付前必须选择） -->
+          <!-- 区块：收货地址 / 已选则展示收件信息，未选则展示告警态与「新增」 / 支付前置条件 -->
           <view class="card card--pad addr-card" @click="openAddressPicker">
             <view v-if="selectedAddress" class="row" style="gap: 12px; align-items: flex-start">
               <view class="addr-ic"><AppIcon name="map-pin" :size="18" color="#0A6A6C" /></view>
@@ -66,7 +66,7 @@
             </view>
           </view>
 
-          <!-- 积分抵扣 -->
+          <!-- 区块：积分抵扣 / 数量步进器 + 积分滑杆 + 快捷抵扣 / 步长为汇率，超上限自动夹紧 -->
           <view class="section">
             <view class="section__head">
               <view class="section__title"><text>积分抵扣</text></view>
@@ -125,7 +125,7 @@
             </view>
           </view>
 
-          <!-- 金额明细 -->
+          <!-- 区块：金额明细 / 商品金额、积分抵扣、已优惠三行 / 抵扣金额由 usePoints 实时计算 -->
           <view class="section">
             <view class="card card--pad">
               <view class="row row--between">
@@ -144,7 +144,7 @@
             </view>
           </view>
 
-          <!-- 规格 / 介绍 -->
+          <!-- 区块：规格与介绍 / 两行信息单元 / 文案过长时自然换行，不做截断 -->
           <view class="card mt12">
             <view class="cell">
               <view class="cell__icon"><AppIcon name="clipboard-list" :size="18" color="#0A6A6C" /></view>
@@ -162,7 +162,7 @@
             </view>
           </view>
 
-          <!-- 服务保障 -->
+          <!-- 区块：服务保障 / 三列等距图标项 / 静态展示，无跳转 -->
           <view class="card card--pad mt12">
             <view class="row" style="justify-content: space-around; gap: 6px">
               <view v-for="x in services" :key="x.t" class="col" style="align-items: center; gap: 4px">
@@ -172,10 +172,11 @@
             </view>
           </view>
 
+          <!-- 占位：为 fixed 结算栏留出高度，避免最后一张卡片被遮挡 -->
           <view style="height: 92px"></view>
         </view>
 
-        <!-- 结算栏 -->
+        <!-- 区块：结算栏 / fixed 吸底（含 env 安全区 padding），左侧实付、右侧购买 / 高度与上方 92px 占位对应 -->
         <view class="checkout-bar">
           <view class="grow">
             <text class="tiny" style="display: block">实付金额</text>
@@ -191,11 +192,18 @@
       </template>
     </view>
 
+    <!-- 全局：全局浮层（登录/解锁/确认弹窗） -->
     <AppOverlays />
   </view>
 </template>
 
 <script>
+/* 商品详情页
+ * 路由参数：id —— 商品 ID（缺省 'g1'）
+ * 数据接口：Api.fetchGoodsDetail(id)、Api.fetchAddresses()、Api.createOrder({ goodsId, qty, usePoints, addressId })
+ * 关键交互：数量加减、积分滑杆/快捷抵扣、选择收货地址、确认下单、拉起支付
+ * 业务限制：数量 1 ~ 库存；积分按 pointsPerYuan 整数倍抵扣、单笔封顶 10 元、实付最低 0.01 元；下单必须有有效地址
+ */
 import AppBar from '../../components/AppBar.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import AppOverlays from '../../components/AppOverlays.vue'
@@ -208,13 +216,13 @@ export default {
   components: { AppBar, AppIcon, AppOverlays },
   data() {
     return {
-      goodsId: 'g1',
-      G: null,
-      qty: 1,
-      usePoints: 0,
-      maxUsable: 0,
-      addresses: [],
-      selectedAddressId: 0,
+      goodsId: 'g1', // 商品 ID，来自路由参数 ?id=，缺省 g1（演示数据）
+      G: null, // 商品详情对象：price/orig/name/tags/sales/stock/spec/desc/img 等；null 时展示骨架
+      qty: 1, // 购买数量，取值 1 ~ G.stock（库存上限）
+      usePoints: 0, // 本次抵扣使用的积分数，须为 pointsPerYuan 的整数倍
+      maxUsable: 0, // 当前可抵扣积分上限（可用积分/10 元封顶/商品金额三者取最小）
+      addresses: [], // 收货地址列表
+      selectedAddressId: 0, // 已选地址 ID，0 表示未选择
       services: [
         { ic: 'shield-check', t: '正品保障' },
         { ic: 'truck', t: '顺丰包邮' },
@@ -223,23 +231,55 @@ export default {
     }
   },
   computed: {
+    /** 当前可用积分（来自本地 Store，真实值以后端为准）
+     * @returns {number}
+     */
     points() { return Store.points },
+    /** 是否会员，影响成功弹窗中的会员引导 */
     isMember() { return Store.isMember },
+    /** 积分兑换汇率：多少积分抵 1 元（后端配置下发）
+     * @returns {number}
+     */
     pointsPerYuan() { return Store.config.pointsPerYuan },
+    /** 商品金额小计 = 单价 × 数量，保留两位；未加载时按 0
+     * @returns {number}
+     */
     total() { return this.G ? +(this.G.price * this.qty).toFixed(2) : 0 },
+    /** 积分抵扣金额（元）= 使用积分 / 汇率
+     * @returns {number}
+     */
     deduct() { return this.usePoints / this.pointsPerYuan },
+    /** 实付金额：总价减抵扣，最低 0.01 元
+     * @returns {number}
+     */
     pay() { return Math.max(0.01, +(this.total - this.deduct).toFixed(2)) },
+    /** 相对原价的立省金额，原价缺失或低于现价时为 0
+     * @returns {number}
+     */
     save() { return this.G ? Math.max(0, +(this.G.orig - this.G.price).toFixed(2)) : 0 },
+    /** 滑杆最大值：至少保留一个步长，避免 slider 因 max=0 无法渲染
+     * @returns {number}
+     */
     sliderMax() { return Math.max(this.maxUsable, this.pointsPerYuan) },
+    /** 抵扣文案：显示已用积分与折算金额
+     * @returns {string}
+     */
     ptLabel() {
       return this.usePoints > 0
         ? '使用 ' + this.usePoints + ' 积分抵 ¥' + this.deduct.toFixed(2)
         : '未使用积分抵扣'
     },
+    /** 当前选中的地址对象，未选中返回 null
+     * @returns {Object|null}
+     */
     selectedAddress() {
       return this.addresses.filter(a => a.id === this.selectedAddressId)[0] || null
     }
   },
+  /**
+   * 读取路由参数并加载商品
+   * @param {Object} options 页面参数，options.id 为商品 ID
+   */
   onLoad(options) {
     this.goodsId = (options && options.id) || 'g1'
     this.load()
@@ -250,6 +290,10 @@ export default {
   },
   methods: {
     money,
+    /**
+     * 加载收货地址并按优先级确定默认选中项
+     * 优先级：地址页回传的待选 ID > 当前已选（仍存在）> 默认地址 > 列表首项
+     */
     async loadAddresses() {
       const res = await Api.fetchAddresses()
       if (res.code !== 0 || !Array.isArray(res.data)) {
@@ -275,13 +319,16 @@ export default {
       const def = this.addresses.filter(a => a.isDefault)[0] || this.addresses[0]
       this.selectedAddressId = def ? def.id : 0
     },
+    /** 打开地址选择：无地址时直接进入新增页，有地址则跳地址列表的选择模式 */
     openAddressPicker() {
       if (!this.addresses.length) { this.addNewAddress(); return }
       nav('/pages/address/address?select=1')
     },
+    /** 跳转新增地址页（select=1 选择模式，back=1 保存后返回本页） */
     addNewAddress() {
       nav('/pages/address-edit/address-edit?select=1&back=1')
     },
+    /** 拉取商品详情，成功后计算抵扣上限并默认拉满可用积分 */
     load() {
       Api.fetchGoodsDetail(this.goodsId).then(res => {
         if (res.code !== 0 || !res.data) { ui.toast(res.msg || '商品加载失败，请重试', 'alert-triangle'); return }
@@ -294,19 +341,37 @@ export default {
     calcMax() {
       const rate = this.pointsPerYuan
       const total = this.G.price * this.qty
+      // 1) 可用积分向下取整到汇率整数倍（不足整数倍部分不可用）
       const avail = Math.floor(Store.points / rate) * rate
       const byCap = 10 * rate // 单笔最多抵 10 元
+      // 2) 商品金额上限：至少保留 0.01 元实付，再取整到汇率倍数
       const byAmount = Math.floor(Math.max(0, total - 0.01)) * rate
+      // 3) 三者取最小得到最终上限
       this.maxUsable = Math.max(0, Math.min(avail, byCap, byAmount))
+      // 4) 数量减少后，已选积分可能超限，回退到上限
       if (this.usePoints > this.maxUsable) this.usePoints = this.maxUsable
     },
+    /** 数量 +1，上限为库存（缺省 99），变动后重算抵扣上限 */
     inc() { if (this.qty < (this.G.stock || 99)) { this.qty++; this.calcMax() } },
+    /** 数量 -1，下限为 1，变动后重算抵扣上限 */
     dec() { if (this.qty > 1) { this.qty--; this.calcMax() } },
+    /**
+     * 滑杆拖动/松手回调，按步长取整后再夹紧到上限
+     * @param {Object} e 滑块事件，e.detail.value 为当前值
+     */
     onSlide(e) { this.usePoints = Math.min(Number(e.detail.value), this.maxUsable) },
+    /**
+     * 快捷抵扣：'max' 拉满，数字则按「元 × 汇率」换算后夹紧
+     * @param {number|string} v 抵扣元数或 'max'
+     */
     quick(v) {
       if (v === 'max') { this.usePoints = this.maxUsable; return }
       this.usePoints = Math.min(Number(v) * this.pointsPerYuan, this.maxUsable)
     },
+    /**
+     * 立即购买：先校验地址，再弹确认框展示订单摘要，确认后创建订单
+     * 未选地址 → 询问是否去填写；取消确认 → 不产生订单
+     */
     async buy() {
       // 支付前置校验：必须已选择有效收货地址
       if (!this.selectedAddress) {
@@ -330,6 +395,10 @@ export default {
       })
       if (yes) this.doOrder()
     },
+    /**
+     * 创建订单：提交商品/数量/积分/地址
+     * 1002 表示地址失效，需重新选择；成功后同步积分余额并进入支付流程
+     */
     doOrder() {
       if (!this.selectedAddress) { this.openAddressPicker(); return }
       Api.createOrder({
@@ -354,6 +423,10 @@ export default {
         this.payOrder(o)
       })
     },
+    /**
+     * 发起支付：真实环境唤起微信支付，原型环境直接进入成功弹窗
+     * @param {Object} o 后端返回的订单，o.payment 为支付参数
+     */
     payOrder(o) {
       // 消费后端返回的 payment：真实支付参数则唤起微信支付；原型（mock）直接进入下单成功
       const p = o && o.payment
@@ -368,6 +441,11 @@ export default {
         this.successModal(o)
       }
     },
+    /**
+     * 下单成功弹窗：展示订单号、抵扣积分、实付与状态
+     * 非会员追加「开通会员」按钮，关闭后统一回到商城
+     * @param {Object} o 订单对象
+     */
     successModal(o) {
       const member = this.isMember
       ui.openModal({
@@ -401,12 +479,14 @@ export default {
 </script>
 
 <style>
+/* 主图：定高 340px 通栏，aspectFill 裁切填充 */
 .pd-hero {
   display: block;
   width: 100%;
   height: 340px;
   background: var(--c-surface-2);
 }
+/* 价格卡上移 16px 压住主图下沿，形成叠压层次 */
 .pd-head { margin-top: -16px; position: relative; z-index: 2; }
 .addr-card { margin-top: 12px; }
 .addr-ic {
@@ -421,6 +501,7 @@ export default {
   display: block; margin-top: 3px; font-size: 12px; line-height: 1.55;
   color: var(--c-ink-3); word-break: break-all;
 }
+/* 新增按钮：最小高度 44px，保证点击热区 */
 .addr-add { min-height: 44px; min-width: 76px; flex: none; }
 .pd-price { align-items: baseline; gap: 8px; }
 .pd-cur { font-size: 14px; color: var(--c-accent-d); font-weight: 700; }

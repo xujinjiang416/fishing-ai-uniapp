@@ -80,9 +80,13 @@ const P = {
   eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>'
 }
 
+/* base64 字符表：按 6 bit 一组的编码顺序排列，供 toBase64 查表使用 */
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
-/* 跨端 base64（小程序无 btoa）：图标 SVG 全为 ASCII，直接按字节编码 */
+/* 跨端 base64（小程序无 btoa）：图标 SVG 全为 ASCII，直接按字节编码
+ * @param {string} input ASCII 字符串（本文件仅用于编码 SVG）
+ * @returns {string} 标准 base64 字符串（含 '=' 填充）
+ */
 function toBase64(input) {
   let out = ''
   let i = 0
@@ -102,7 +106,12 @@ function toBase64(input) {
   return out
 }
 
-/* 生成图标 SVG 字符串（stroke 用具体色值，避免小程序无法继承 currentColor） */
+/* 生成图标 SVG 字符串（stroke 用具体色值，避免小程序无法继承 currentColor）
+ * @param {string} name 图标名（见 P，未命中时回退 info 图标）
+ * @param {number} [size=20] 图标尺寸（px）
+ * @param {string} [color='#12211F'] 描边色，必须是具体色值（不支持 currentColor）
+ * @returns {string} 完整 <svg> 标记字符串
+ */
 export function iconSvg(name, size, color) {
   const paths = P[name] || P.info
   const s = size || 20
@@ -112,7 +121,12 @@ export function iconSvg(name, size, color) {
     paths + '</svg>'
 }
 
-/* 生成 <image> 可直接使用的 DataURI */
+/* 生成 <image> 可直接使用的 DataURI
+ * @param {string} name 图标名
+ * @param {number} [size=20] 图标尺寸（px）
+ * @param {string} [color='#12211F'] 描边色
+ * @returns {string} 'data:image/svg+xml;base64,...' 形式的地址
+ */
 export function iconUri(name, size, color) {
   return 'data:image/svg+xml;base64,' + toBase64(iconSvg(name, size, color))
 }

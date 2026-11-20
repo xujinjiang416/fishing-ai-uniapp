@@ -1,10 +1,16 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
   <head>
+    <!-- HTML 外壳：仅在 H5 端生效；小程序 / App 的页面骨架由编译产物生成，与本文件无关 -->
     <meta charset="UTF-8" />
+    <!-- 基础视口：width=设备宽、禁止缩放的初值；viewport-fit=cover 处理刘海屏安全区（见下方脚本） -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- 站点标题（H5 浏览器标签页 / 分享卡片标题） -->
     <title>渔获 AI · 钓鱼助手</title>
     <script>
+      /* 运行期检测当前 WebView 是否支持 env()/constant() 安全区变量：
+       * 支持才追加 viewport-fit=cover，避免老内核因不识别该值而忽略整个 viewport 配置。
+       * 采用 document.write 是因为该 meta 必须在文档解析阶段输出才能生效。 */
       var coverSupport = 'CSS' in window && typeof CSS.supports === 'function'
         && (CSS.supports('top: env(a)') || CSS.supports('top: constant(a)'))
       document.write(
@@ -13,7 +19,9 @@
     </script>
   </head>
   <body>
+    <!-- Vue 应用挂载点：main.js 中的 createApp() 产物会渲染到此节点 -->
     <div id="app"></div>
+    <!-- 入口脚本（type=module，由 Vite 在 H5 端托管并打包依赖） -->
     <script type="module" src="/main.js"></script>
   </body>
 </html>

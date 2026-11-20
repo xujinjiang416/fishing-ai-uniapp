@@ -3,14 +3,14 @@
     <view class="app-main">
       <AppBar title="订单详情" back />
 
-      <!-- 加载骨架 -->
+      <!-- 区块：加载骨架 / 状态卡 + 详情卡 + 金额卡的占位 / 仅 loading 时展示 -->
       <view v-if="loading" class="page" style="padding-top: 6px">
         <view class="skel" style="height: 168px; border-radius: var(--r-lg)"></view>
         <view class="skel mt12" style="height: 190px; border-radius: var(--r-lg)"></view>
         <view class="skel mt12" style="height: 120px; border-radius: var(--r-lg)"></view>
       </view>
 
-      <!-- 加载失败 -->
+      <!-- 区块：加载失败空态 / 错误图标 + 重试按钮 / 仅在无缓存的 order 时展示 -->
       <view v-else-if="error && !order" class="empty">
         <view class="empty__ic"><AppIcon name="alert-triangle" :size="26" color="#9AA9A7" /></view>
         <text class="empty__t">{{ error }}</text>
@@ -20,7 +20,7 @@
 
       <template v-else-if="order">
         <view class="page" style="padding-top: 4px">
-          <!-- 状态与流转 -->
+          <!-- 区块：状态与流转 / 状态图标 + 文案 + 节点进度条 / 节点少于 4 个时收窄宽度 -->
           <view class="card card--pad status-card">
             <view class="row" style="gap: 12px; align-items: flex-start">
               <view class="st-ic" :style="'background:' + tint(meta.color)">
@@ -56,7 +56,7 @@
             </view>
           </view>
 
-          <!-- 退款提示 -->
+          <!-- 区块：退款提示 / 通栏告警条 / 仅在已退款或申请被驳回时出现 -->
           <view v-if="showRefund" class="notice notice--warn mt12">
             <AppIcon name="coins" :size="15" color="#8E6210" />
             <text class="grow">
@@ -66,7 +66,7 @@
             </text>
           </view>
 
-          <!-- 物流信息 -->
+          <!-- 区块：物流信息 / 四态切换（加载中 / 失败重试 / 暂无 / 已发货信息）/ 只展示单号与电话，不展示轨迹 -->
           <view class="card card--pad mt12">
             <view class="row row--between">
               <view class="card__title">
@@ -135,7 +135,7 @@
             <text v-if="lgUpdatedAt" class="tiny lg-time">最后刷新 {{ lgUpdatedAt }}</text>
           </view>
 
-          <!-- 商品信息 -->
+          <!-- 区块：商品信息 / 左侧缩略图 + 右侧名称、规格、单价与数量 / 缺图时展示占位块 -->
           <view class="card card--pad mt12">
             <view class="row" style="gap: 12px; align-items: flex-start">
               <image v-if="order.goodsImg" class="gd-img" :src="order.goodsImg" mode="aspectFill" />
@@ -153,7 +153,7 @@
             </view>
           </view>
 
-          <!-- 金额明细 -->
+          <!-- 区块：金额明细 / 商品金额、积分抵扣、实付、退款 / 抵扣额由 total - amount 反推 -->
           <view class="card card--pad mt12">
             <view class="kv">
               <text class="kv__k">商品金额</text>
@@ -176,7 +176,7 @@
             </view>
           </view>
 
-          <!-- 收货信息 -->
+          <!-- 区块：收货信息 / 收件人、电话、地址、配送方式 / 长地址允许换行折行 -->
           <view class="card card--pad mt12">
             <view class="card__title" style="margin-bottom: 6px">
               <AppIcon name="map-pin" :size="16" color="#0A6A6C" />
@@ -200,7 +200,7 @@
             </view>
           </view>
 
-          <!-- 订单信息 -->
+          <!-- 区块：订单信息 / 编号、下单/支付/发货/完成/取消各节点时间 / 时间字段缺失时对应行不渲染 -->
           <view class="card card--pad mt12">
             <view class="card__title" style="margin-bottom: 6px">
               <AppIcon name="clipboard-list" :size="16" color="#0A6A6C" />
@@ -242,6 +242,7 @@
             </view>
           </view>
 
+          <!-- 区块：页脚说明 / 居中免责声明 / 预留底部安全间距 -->
           <view class="mt24" style="text-align: center; padding-bottom: 8px">
             <text class="tiny" style="display: block">物流信息仅供参考，请以承运商官方查询结果为准</text>
           </view>
@@ -249,12 +250,15 @@
       </template>
     </view>
 
+    <!-- 全局：全局浮层（登录/解锁/弹窗） -->
     <AppOverlays />
   </view>
 </template>
 
 <script>
 /* 订单详情
+ * 路由参数：no —— 订单编号（必填，decodeURIComponent 后用于请求）
+ * 数据接口：Api.fetchOrderDetail(no) 订单主体、Api.fetchOrderLogistics(no) 物流信息
  * 1) 完整状态流转（待付款 → 待发货 → 待收货 → 已完成；取消 / 退款分支）
  * 2) 物流模块仅展示：物流公司、运单号、官方查询电话（不含任何轨迹节点）
  * 3) 支持手动刷新物流信息，覆盖加载中 / 加载失败重试 / 暂无物流三种状态
@@ -267,7 +271,15 @@ import Api from '../../common/api.js'
 import { money, orderStatusMeta, orderFlow } from '../../common/utils.js'
 import * as ui from '../../common/ui.js'
 
+/**
+ * 两位补零（时间展示用）
+ * @param {number} n 待格式化的数值（0-99）
+ * @returns {string} 补零后的两位字符串
+ */
 function pad2(n) { return n < 10 ? '0' + n : String(n) }
+/** 生成 HH:mm:ss 格式的当前时刻，用于展示物流刷新时间
+ * @returns {string}
+ */
 function nowTime() {
   const d = new Date()
   return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds())
@@ -277,32 +289,48 @@ export default {
   components: { AppBar, AppIcon, AppOverlays },
   data() {
     return {
-      no: '',
-      order: null,
-      loading: true,
-      error: '',
-      lg: { company: '', no: '', phone: '', deliveryType: '', shippedAt: '' },
-      lgLoading: false,
-      lgError: '',
-      lgUpdatedAt: ''
+      no: '', // 订单编号，来自路由参数 ?no=（已解码）
+      order: null, // 订单数据：status/goods/qty/total/amount/收货信息/各节点时间等
+      loading: true, // 首屏骨架开关
+      error: '', // 加载失败文案，与 order 同时为空时展示错误空态
+      lg: { company: '', no: '', phone: '', deliveryType: '', shippedAt: '' }, // 物流信息：公司/运单号/查询电话/配送方式/发货时间
+      lgLoading: false, // 物流请求中，控制刷新按钮与加载态
+      lgError: '', // 物流请求失败文案
+      lgUpdatedAt: '' // 最近一次刷新物流的时刻（HH:mm:ss）
     }
   },
   computed: {
+    /** 状态展示元信息（文案/图标/颜色/标签类名），未知状态走兜底
+     * @returns {Object}
+     */
     meta() {
       return orderStatusMeta(this.order ? this.order.status : '')
     },
+    /** 状态流转节点序列，每项含 state: done / current / todo
+     * @returns {Object[]}
+     */
     flow() {
       return orderFlow(this.order ? this.order.status : '')
     },
+    /** 是否已有物流（以运单号存在为准）
+     * @returns {boolean}
+     */
     hasLogistics() {
       return !!(this.lg && this.lg.no)
     },
+    /** 是否展示退款提示条：存在退款金额或退款被驳回
+     * @returns {boolean}
+     */
     showRefund() {
       const o = this.order
       if (!o) return false
       return !!(o.refundAmount || o.refundStatus === 'rejected')
     }
   },
+  /**
+   * 读取订单号并加载详情；缺失订单号时直接进入错误态
+   * @param {Object} options 页面参数，options.no 为订单编号
+   */
   onLoad(options) {
     this.no = (options && options.no) ? decodeURIComponent(options.no) : ''
     if (!this.no) {
@@ -314,11 +342,17 @@ export default {
   },
   methods: {
     money,
+    /**
+     * 将十六进制色值转为 12% 透明度的 rgba，用于状态图标底色
+     * @param {string} hex 形如 #RRGGBB 或 #RGB
+     * @returns {string}
+     */
     tint(hex) {
       const h = String(hex || '#6E807E').replace('#', '')
       const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16)
       return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',.12)'
     },
+    /** 拉取订单详情，并把物流相关字段拆到 lg 对象中 */
     async load() {
       this.loading = true
       this.error = ''
@@ -338,6 +372,10 @@ export default {
       }
       this.lgError = ''
     },
+    /**
+     * 手动刷新物流：同一时刻只允许一次请求
+     * 成功覆盖 lg 并记录刷新时刻；失败仅展示错误态，保留原有订单信息
+     */
     async refreshLogistics() {
       if (this.lgLoading) return
       this.lgLoading = true
@@ -358,9 +396,11 @@ export default {
       this.lgUpdatedAt = nowTime()
       ui.toast('物流信息已刷新', 'refresh-cw')
     },
+    /** 复制运单号，提示前往官方渠道查询 */
     copyNo() {
       if (this.lg.no) ui.copy(this.lg.no, '运单号已复制，可前往物流官方渠道查询')
     },
+    /** 拨打物流官方查询电话，失败时回退为提示手动拨打 */
     callPhone() {
       if (!this.lg.phone) return
       uni.makePhoneCall({
@@ -368,6 +408,7 @@ export default {
         fail: () => ui.toast('拨号未完成，可手动拨打 ' + this.lg.phone, 'smartphone')
       })
     },
+    /** 复制订单编号到剪贴板 */
     copyOrderNo() {
       if (this.order) ui.copy(this.order.no, '订单编号已复制')
     }
@@ -376,6 +417,7 @@ export default {
 </script>
 
 <style>
+/* 状态卡：允许溢出，避免当前节点外圈光晕被卡片裁剪 */
 .status-card { overflow: visible; }
 .st-ic {
   width: 46px; height: 46px; border-radius: 14px; flex: none;
@@ -384,8 +426,9 @@ export default {
 .st-t { font-family: var(--font-display); font-size: 21px; font-weight: 700; line-height: 1.25; }
 .st-d { display: block; margin-top: 3px; font-size: 12.5px; color: var(--c-ink-3); line-height: 1.5; }
 
-/* 状态流转 */
+/* 状态流转：flex 等分节点，连接线绝对定位在节点之间 */
 .flow { display: flex; align-items: flex-start; }
+/* 已取消等少于 4 个节点的场景收窄整行，避免节点间距过大 */
 .flow--short { max-width: 66%; }
 .flow__seg {
   position: relative; flex: 1; min-width: 0;

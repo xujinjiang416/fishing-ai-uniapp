@@ -1,7 +1,8 @@
 <template>
+  <!-- 区块：页面根容器 / app-main 预留底部 tabbar 空间，浮层组件挂在最外层 -->
   <view class="app">
     <view class="app-main">
-      <!-- 加载骨架 -->
+      <!-- 区块：加载骨架 / loading 期间用灰块占位，保持与真实卡片相近的高度避免跳动 -->
       <view v-if="loading" class="page" style="padding-top: 16px; padding-left: 16px; padding-right: 16px">
         <view class="skel" style="height: 232px; border-radius: 28px"></view>
         <view class="skel mt16" style="height: 150px; border-radius: 22px"></view>
@@ -18,7 +19,7 @@
       </view>
 
       <template v-else>
-        <!-- Hero -->
+        <!-- 区块：Hero 头图 / 顶部叠大图 + 定位胶囊与「赚积分」入口，文案底部留白避开下压的概览卡 -->
         <view class="hero reveal" style="--d: 0">
           <image class="hero__img" :src="heroImg" mode="aspectFill" />
           <view class="hero__mask"></view>
@@ -42,7 +43,7 @@
         </view>
 
         <view class="page" style="margin-top: -26px; position: relative; z-index: 2">
-          <!-- 今日概览 -->
+          <!-- 区块：今日概览卡 / 出水色底，左侧指数与 AI 短评，右侧天气要素，底部最佳时段与全预报入口 -->
           <view class="card card--water card--pad reveal" style="--d: 1">
             <view class="row row--between" style="align-items: flex-start">
               <view>
@@ -75,7 +76,7 @@
             </view>
           </view>
 
-          <!-- 核心功能 -->
+          <!-- 区块：核心功能列表 / 按使用频次排序，卡片点击走 goFeature 做会员鉴权；未解锁显示锁提示 -->
           <view class="section">
             <view class="section__head">
               <view class="section__title"><text>核心功能</text></view>
@@ -113,7 +114,7 @@
             </view>
           </view>
 
-          <!-- 积分 / 签到 -->
+          <!-- 区块：积分 / 签到 / 看广告 / 两列卡片 + 一条通栏广告入口，数据均来自 Store -->
           <view class="section">
             <view class="grid2">
               <view class="card card--pad reveal" style="--d: 4" @click="go('/pages/shop/shop')">
@@ -156,7 +157,7 @@
             </view>
           </view>
 
-          <!-- 会员 -->
+          <!-- 区块：会员卡片 / isMember 时展示权益生效态，否则展示首个套餐的价格与开通入口 -->
           <view class="section">
             <view v-if="isMember" class="card card--gold card--pad reveal" style="--d: 6">
               <view class="row" style="gap: 12px">
@@ -188,7 +189,7 @@
             </view>
           </view>
 
-          <!-- 出钓工具 -->
+          <!-- 区块：出钓工具入口 / 四宫格，weather 与 spots 工具需会员，清单类工具直接跳转 -->
           <view class="section">
             <view class="section__head">
               <view class="section__title"><text>出钓工具</text></view>
@@ -207,7 +208,7 @@
             </view>
           </view>
 
-          <!-- 广告位 -->
+          <!-- 区块：广告位 / 仅非会员展示，点击进入「赚积分」页领取广告任务 -->
           <view v-if="!isMember" class="section">
             <view class="card card--pad reveal ad-slot" style="--d: 8" @click="go('/pages/earn/earn')">
               <view class="row" style="gap: 10px">
@@ -221,6 +222,7 @@
             </view>
           </view>
 
+          <!-- 区块：页脚说明 / 免责声明与演示标识，底部额外留白避开 tabbar -->
           <view class="mt24" style="text-align: center; padding-bottom: 8px">
             <text class="tiny" style="display: block">渔获 AI · 数据由大模型与气象源联合生成，仅供出钓参考</text>
             <text class="tiny mt4" style="color: var(--c-ink-4); display: block">原型演示 · 不产生真实交易与扣款</text>
@@ -235,6 +237,21 @@
 </template>
 
 <script>
+/* 首页 —— FishCast 主入口
+ *
+ * 职责：展示今日出钓指数概览、核心功能入口（天气 / 野塘）、积分签到、会员与工具区。
+ * props/emits：页面级组件，无 props、无 emits。
+ * 数据来源：
+ *   - Api.ensureConfig()：同步后台配置（签到 / 广告额度 / 会员套餐）；
+ *   - Api.fetchWeather({ place, placeDetail })：W 天气、V 研判、SLOTS 时段轴；
+ *   - Api.fetchAdCreatives()：首页广告位素材（取第一条）；
+ *   - Store：位置、积分、签到、会员状态等本地状态。
+ * 关键交互：
+ *   - 点击定位胶囊 → ui.locationSheet() 选省市区，关闭后重新拉取天气；
+ *   - 点击功能 / 工具 → ui.requireUnlock() 鉴权，通过后跳转，未开通则引导会员页；
+ *   - 会员能力通过 Store.isUnlocked(feature) 判断。
+ * 注意事项：本页为图标 + 卡片式布局，样式依赖全局 token（--c-* 变量），页面内 style 只做局部微调。
+ */
 import AppIcon from '../../components/AppIcon.vue'
 import AppTabBar from '../../components/AppTabBar.vue'
 import AppOverlays from '../../components/AppOverlays.vue'
@@ -249,13 +266,24 @@ export default {
   components: { AppIcon, AppTabBar, AppOverlays },
   data() {
     return {
+      // 首屏加载中标记：true 时渲染骨架屏
       loading: true,
+      // 天气实况（condition / temp / pressure / windDir / windLevel 等），来自 fetchWeather
       W: {},
+      // 鱼情研判结论（score / name / advice），来自 fetchWeather
       V: {},
+      // 全天时段概率轴数据，当前仅用于取「最佳时段」（best 计算属性）
       SLOTS: [],
+      // 暴露全局状态到模板，便于直接读 Store.xxx（避免每处都写 this.Store）
       Store,
+      // Hero 头图背景（本地静态图资源）
       heroImg: IMG.lakeHero,
+      // 首页广告位素材对象 { brand, slogan, cta }，接口失败时保持空串
       ad: { brand: '', slogan: '', cta: '' },
+      /* 核心功能配置：
+       * feature = 鉴权用功能键（weather / spots）；href = 目标页；icon = AppIcon 键名；
+       * title / desc / tags = 展示文案；badge / badgeCls = 角标文案与样式；
+       * lockTitle = 未解锁弹窗标题；d = 入场动画延迟序号 */
       features: [
         {
           feature: 'weather', href: '/pages/weather/weather', icon: 'cloud',
@@ -272,6 +300,7 @@ export default {
           lockTitle: '解锁「附近野塘查询」', d: 3
         }
       ],
+      /* 出钓工具配置：ic = 图标键名，t = 名称，href = 目标页，lock = 需鉴权的功能键（null 表示免鉴权） */
       tools: [
         { ic: 'sunrise', t: '黄金时段', href: '/pages/weather/weather', lock: 'weather' },
         { ic: 'map-pin', t: '附近野塘', href: '/pages/spots/spots', lock: 'spots' },
@@ -281,31 +310,68 @@ export default {
     }
   },
   computed: {
+    /** 是否会员：决定会员卡形态、广告位与锁定提示的显隐 */
     isMember() { return Store.isMember },
+    /**
+     * 首页定位展示文案
+     * @returns {String} 形如「杭州·西湖」，城市去掉「市」后缀
+     */
     locText() {
       const l = Store.location
       return String(l.city).replace('市', '') + '·' + l.district
     },
+    /**
+     * Hero 顶部安全区偏移：状态栏高度 + 10px 视觉留白
+     * @returns {String} 行内 style 字符串
+     */
     heroTopStyle() { return 'padding-top:' + (statusBarHeight + 10) + 'px' },
+    /**
+     * 最佳时段：优先取第 2 个时段，缺失时回退第 1 个或空对象
+     * （时段轴按概率排序，第 1 个为全天最高/最早，业务上以第 2 个为「次优可守」时段）
+     * @returns {Object} { time, name }
+     */
     best() { return this.SLOTS[1] || this.SLOTS[0] || { time: '', name: '' } },
+    /**
+     * 概览卡 AI 短评（截断 18 字，避免换行挤压缩略布局）
+     * @returns {String} 短文案
+     */
     adviceShort() { return String(this.V.advice || '').slice(0, 18) },
+    /**
+     * 积分进度条百分比：20 分对应 1%，上限 100
+     * @returns {Number} 0~100
+     */
     pointsPct() { return Math.min(100, Store.data.points / 20) },
     // 广告积分 / 额度 / 套餐均以后台配置为准
+    /** 单条广告奖励积分（后台配置） */
     adPoints() { return Store.adPoints },
+    /** 会员每日广告额度（后台配置） */
     memberLimit() { return Store.config.ad.limitMember },
+    /** 非会员每日广告额度（后台配置） */
     normalLimit() { return Store.config.ad.limitNormal },
+    /** 当前身份下的签到积分（会员/非会员不同，由 Store 计算） */
     checkinPoints() { return Store.checkinPoints },
+    /** 首个会员套餐（用于会员卡展示价格），无套餐时为 null */
     memberPlan() { return (Store.plans && Store.plans[0]) || null },
     // 会员卡片标题：套餐信息取自后台配置
+    /**
+     * 会员卡标题：有套餐时拼「¥价格 / 时长」，否则仅「开通会员」
+     * @returns {String} 标题文案
+     */
     memberTitle() {
       const p = this.memberPlan
       if (!p) return '开通会员'
       return '开通会员 · ¥' + money(p.price) + ' / ' + (p.durationLabel || '')
     },
+    /** 积分兑换比例：多少积分抵 1 元（后台配置） */
     pointsPerYuan() { return Store.config.pointsPerYuan },
+    /** 会员权益标签列表（由配置动态拼接） */
     memberTags() {
       return ['无限次查询', '全程无广告', '签到 +' + this.checkinPoints + ' 分/天', '每日 ' + this.memberLimit + ' 条广告']
     },
+    /**
+     * 签到卡副文案
+     * @returns {String} 「今日已签到」或「今日待签到 · +N 分」
+     */
     checkinHint() {
       const d = Store.data
       if (d.checkedToday) return '今日已签到'
@@ -321,6 +387,12 @@ export default {
   },
   methods: {
     money,
+    /**
+     * 拉取首页天气与研判
+     * 分步：① 读取 Store 当前省市区拼成 place；② 请求天气接口；
+     *       ③ 校验 code 与 data；④ 分别落到 W / V / SLOTS 并结束 loading。
+     * @returns {void}
+     */
     load() {
       this.loading = true
       const l = Store.location
@@ -335,16 +407,36 @@ export default {
         this.loading = false
       })
     },
+    /**
+     * 拉取广告素材：取列表第一条作为首页广告位；失败时保持占位空串
+     * @returns {void}
+     */
     loadAd() {
       Api.fetchAdCreatives().then(res => {
         if (res.code === 0 && res.data && res.data.length) this.ad = res.data[0]
       })
     },
+    /**
+     * 站内跳转（统一走 nav，便于统一处理登录态与 tab 页）
+     * @param {String} url 目标页面路径
+     * @returns {void}
+     */
     go(url) { nav(url) },
+    /**
+     * 打开位置选择弹层，关闭后按新位置重新拉取天气
+     * @returns {Promise<void>}
+     */
     async openLocation() {
       await ui.locationSheet()
       this.load()
     },
+    /**
+     * 带会员鉴权的功能跳转：未解锁时弹出套餐选择，用户选择后前往会员页
+     * @param {String} feature 功能键 weather | spots
+     * @param {String} href    鉴权通过后的目标页面
+     * @param {String} title   未解锁弹窗标题
+     * @returns {Promise<void>}
+     */
     async goFeature(feature, href, title) {
       const ok = await ui.requireUnlock({
         feature,
@@ -354,6 +446,11 @@ export default {
       })
       if (ok) nav(href)
     },
+    /**
+     * 点击出钓工具：有 lock 的走鉴权，无 lock 的直接跳转
+     * @param {Object} x 工具配置 { ic, t, href, lock }
+     * @returns {void}
+     */
     onTool(x) {
       if (x.lock) {
         this.goFeature(x.lock, x.href, x.lock === 'weather' ? '开通会员查看钓鱼天气' : '开通会员查看附近野塘')
@@ -366,17 +463,23 @@ export default {
 </script>
 
 <style>
+/* 页面级局部样式：仅覆盖首页特有元素，通用卡片 / 网格 / 按钮样式来自全局设计系统 */
 /* 上移 hero 文案，避免被下方 -26px 上叠的概览卡遮住 */
 .hero__body { bottom: 36px; }
+/* 概览卡内的超大出钓指数与天气要素字号 */
 .ov-score { font-family: var(--font-display); font-size: 42px; font-weight: 700; line-height: 1; color: #fff; }
 .ov-cond { font-size: 13px; color: #fff; }
+/* 积分 / 连续天数的大号数字 */
 .big-num { font-family: var(--font-display); font-size: 27px; font-weight: 700; margin-top: 4px; display: block; }
+/* 会员卡内头像文字 */
 .avatar__t { color: #fff; font-weight: 700; font-size: 12px; }
+/* 四宫格工具卡：纵向居中排列，图标与文字间距 6px */
 .tool-cell {
   border: 1px solid var(--c-line);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 6px; padding: 13px 6px;
 }
 .tool-cell__t { font-size: 11.5px; color: var(--c-ink-2); }
+/* 首页广告位：浅水蓝渐变底，与会员金色卡形成区分 */
 .ad-slot { background: linear-gradient(120deg, #F7FBFA, #EEF6F5); }
 </style>
