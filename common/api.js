@@ -56,10 +56,10 @@ const Api = {
     return res
   },
 
-  /* POST /api/auth/login body:{account,password} -> { token, user }；account 为手机号 */
+  /* POST /api/auth/login body:{account,password} -> { token, user }；account 为用户名 */
   /**
-   * 账号密码登录（成功后自动写入本地 token）
-   * @param {string} account 手机号
+   * 用户名密码登录（成功后自动写入本地 token）
+   * @param {string} account 用户名（4-16 位）
    * @param {string} password 密码（明文交给 HTTPS 传输，前端不做加密）
    * @returns {Promise<{code: number, data: *, msg?: string}>} data 含 { token, user }
    */
@@ -72,19 +72,19 @@ const Api = {
     return res
   },
 
-  /* POST /api/auth/register body:{phone,password,confirmPassword} -> { token, user, isNew } */
+  /* POST /api/auth/register body:{username,password,confirmPassword} -> { token, user, isNew } */
   /**
-   * 手机号注册（成功后自动写入本地 token，等同登录）
-   * @param {string} phone 手机号
+   * 用户名注册（成功后自动写入本地 token，等同登录）
+   * @param {string} username 用户名（4-16 位）
    * @param {string} password 密码
    * @param {string} confirmPassword 确认密码（由后端校验一致性）
    * @returns {Promise<{code: number, data: *, msg?: string}>} data 含 { token, user, isNew }
    */
-  async register(phone, password, confirmPassword) {
+  async register(username, password, confirmPassword) {
     const res = await call('/auth/register', {
       method: 'POST',
       data: {
-        phone: phone || '',
+        username: username || '',
         password: password || '',
         confirmPassword: confirmPassword || ''
       }

@@ -32,8 +32,34 @@
           </view>
         </view>
 
+        <!-- 区块：未登录引导 / 不发起天气查询，先让用户登录 -->
+        <view v-if="needLogin" class="card card--pad mt16 reveal" style="text-align: center">
+          <view class="cell__icon" style="width: 48px; height: 48px; margin: 0 auto 10px">
+            <AppIcon name="user" :size="22" color="#0A6A6C" />
+          </view>
+          <text class="unlock-title">请先登录</text>
+          <text class="muted mt4" style="display: block; line-height: 1.6">登录后才能查看对应地点的天气与鱼情研判</text>
+          <view class="btn btn--primary btn--block btn--lg mt12" @click="goLogin">
+            <AppIcon name="user" :size="18" color="#FFFFFF" />
+            <text>去登录</text>
+          </view>
+        </view>
+
+        <!-- 区块：已登录但未选点时的引导 / 不发起天气查询，先让用户选择位置 -->
+        <view v-else-if="needLocation" class="card card--pad mt16 reveal" style="text-align: center">
+          <view class="cell__icon" style="width: 48px; height: 48px; margin: 0 auto 10px">
+            <AppIcon name="map-pin" :size="22" color="#0A6A6C" />
+          </view>
+          <text class="unlock-title">请先选择位置</text>
+          <text class="muted mt4" style="display: block; line-height: 1.6">选择省/市/区后，才能获取对应地点的天气与鱼情研判</text>
+          <view class="btn btn--primary btn--block btn--lg mt12" @click="openLocation">
+            <AppIcon name="crosshair" :size="18" color="#FFFFFF" />
+            <text>选择位置</text>
+          </view>
+        </view>
+
         <!-- 区块：加载骨架 / 实况卡 + 三列指标 + 海报的等高占位，减少数据回填时的布局跳动 -->
-        <template v-if="loading">
+        <template v-else-if="loading">
           <view class="skel mt16" style="height: 150px; border-radius: 22px"></view>
           <view class="grid3 mt16">
             <view class="skel" style="height: 92px"></view>
@@ -59,7 +85,7 @@
 
           <!-- 区块：结果主体 / 非会员时加 lock-blur 模糊，但不阻断页面滚动 -->
           <view :class="{ 'lock-blur': locked }">
-            <!-- 区块：当前实况卡 / 天气状况、体感与水温、更新时间、温度区间、日出日落与气压 -->
+            <!-- 区块：当前实况卡 / 天气状况、体感、更新时间、温度区间、日出日落与气压 -->
             <view class="card card--pad mt12 reveal" style="--d: 0">
               <view class="row row--between" style="align-items: flex-start">
                 <view class="row" style="gap: 12px">
@@ -68,7 +94,7 @@
                   </view>
                   <view>
                     <text style="font-size: 15px; font-weight: 600; display: block">{{ W.condition }}</text>
-                    <text class="tiny mt4" style="display: block">体感 {{ W.tempFeel }}℃ · 水温 {{ W.waterTemp }}℃</text>
+                    <text class="tiny mt4" style="display: block">体感 {{ W.tempFeel }}℃</text>
                     <view class="row mt4" style="gap: 3px">
                       <AppIcon name="clock" :size="11" color="#9AA9A7" />
                       <text class="tiny">{{ W.updated }}</text>
@@ -114,33 +140,6 @@
                   </view>
                   <text v-if="m.hint" class="tiny">{{ m.hint }}</text>
                 </view>
-              </view>
-
-              <!-- 区块：气压趋势小图 / 柱高按 6 小时序列归一化，最后一根用强调色标「当前」 -->
-              <view class="card card--pad mt12 reveal" style="--d: 1">
-                <view class="row row--between">
-                  <view class="row" style="gap: 6px">
-                    <AppIcon name="gauge" :size="16" color="#12211F" />
-                    <text style="font-size: 14px; font-weight: 600">近 6 小时气压趋势</text>
-                  </view>
-                  <view class="tag" :class="pressureUp ? 'tag--success' : 'tag--warn'">
-                    <AppIcon :name="pressureUp ? 'trending-up' : 'refresh-cw'" :size="12" :color="pressureUp ? '#1D7A50' : '#A97410'" />
-                    <text>{{ pressureUp ? '上升 ' : '变化 ' }}{{ W.pressure6h }} hPa</text>
-                  </view>
-                </view>
-                <view class="row" style="align-items: flex-end; gap: 6px; height: 66px; margin-top: 12px">
-                  <view
-                    v-for="(b, i) in pressureBars"
-                    :key="i"
-                    class="grow"
-                    :style="'height:' + b.h + '%;background:' + (b.last ? 'var(--c-accent)' : 'var(--c-primary)') + ';opacity:' + b.opacity + ';border-radius:5px 5px 2px 2px'"
-                  ></view>
-                </view>
-                <view class="row row--between mt4">
-                  <text class="tiny">5 小时前</text>
-                  <text class="tiny">当前 {{ W.pressure }} hPa</text>
-                </view>
-                <text class="muted mt8" style="display: block">气压稳中有升，水体溶氧持续补充，鱼群开口意愿强，是难得的好天。</text>
               </view>
 
               <view class="grid3 mt12">
@@ -286,12 +285,12 @@
             <view class="section">
               <view class="section__head">
                 <view class="section__title"><text>全天时段口型</text></view>
-                <text class="section__more">左右滑动 · 例如 16:00-18:00 狂口</text>
+                <text class="section__more">左右滑动 · 例如 16:00-18:00 连杆</text>
               </view>
               <SlotAxis :slots="SLOTS" :nowIdx="nowIdx" />
             </view>
 
-            <!-- 区块：AI 出钓建议 / 固定 7 条建议模板，其中风向、水温、温差等取自实时天气 -->
+            <!-- 区块：AI 出钓建议 / 固定 7 条建议模板，其中风向、温差等取自实时天气 -->
             <view class="section">
               <view class="section__head">
                 <view class="section__title"><text>AI 出钓建议</text></view>
@@ -365,8 +364,6 @@ import { nowSlotIndex, ymd } from '../../common/utils.js'
 import * as ui from '../../common/ui.js'
 import { nav } from '../../common/nav.js'
 
-/* 近 6 小时气压序列（由远及近），用于绘制气压趋势柱状图 */
-const PRESSURE_6H = [1015.4, 1016.2, 1016.9, 1017.6, 1018.1, 1018.6]
 /* 日期切换标签：索引即 dayIdx（0 今天 / 1 明天 / 2 后天） */
 const DAY_TABS = ['今天', '明天', '后天']
 
@@ -385,8 +382,8 @@ const MOON_AGE = {
 export default {
   components: { AppBar, AppIcon, AppTabBar, AppOverlays, CatchPoster, SlotAxis },
   data() {
-    // loading 加载态；W 天气实况；V 研判结论；SLOTS 全天时段；nowIdx 当前时段下标；dayIdx 选中日期
-    return { loading: true, W: {}, V: {}, SLOTS: [], nowIdx: 0, dayIdx: 0 }
+    // loading 加载态；needLogin 未登录；needLocation 已登录未选点；W 天气实况；V 研判结论；SLOTS 全天时段；nowIdx 当前时段下标；dayIdx 选中日期
+    return { loading: true, needLogin: false, needLocation: false, W: {}, V: {}, SLOTS: [], nowIdx: 0, dayIdx: 0 }
   },
   computed: {
     /**
@@ -408,53 +405,32 @@ export default {
      */
     locLine() {
       const l = Store.location
-      return l.province + ' ' + l.city + ' ' + l.district
-    },
-    /** 气压是否处于上升趋势（决定趋势标签的文案与配色） */
-    pressureUp() { return this.W.pressureTrend === 'up' },
-    /**
-     * 气压柱状图的每根柱子
-     * 算法：以 6 小时序列的最小值为 0 基线、最大值归一化，
-     *       柱高映射到 32%~98%；越靠后透明度越高，最后一根标记为 last（当前）。
-     * @returns {Array<{h: Number, opacity: Number, last: Boolean}>} h 为百分比高度
-     */
-    pressureBars() {
-      const vals = PRESSURE_6H
-      const min = Math.min.apply(null, vals)
-      const max = Math.max.apply(null, vals)
-      const span = (max - min) || 1
-      return vals.map((v, i) => ({
-        h: 32 + Math.round((v - min) / span * 66),
-        opacity: i === vals.length - 1 ? 1 : (0.4 + i * 0.1),
-        last: i === vals.length - 1
-      }))
+      const s = [l.province, l.city, l.district].filter(Boolean).join(' ')
+      return s || '未选择位置'
     },
     /**
-     * 气象要素第一组（2 列）：气压（含趋势文案与涨跌配色）、风向风力
-     * @returns {Array<{ic, k, v, u, color, hint}>}
+     * 气象要素第一组（2 列）：气压、风向风力
+     * @returns {Array<{ic, k, v, u, hint}>}
      */
     metricsTop() {
       const W = this.W
-      const upColor = W.pressureTrend === 'up' ? 'var(--c-success)' : (W.pressureTrend === 'down' ? 'var(--c-danger)' : 'inherit')
-      const trendTxt = W.pressureTrend === 'up'
-        ? ('较 6 小时前上升 ' + W.pressure6h + ' hPa')
-        : (W.pressureTrend === 'down' ? ('较 6 小时前下降 ' + W.pressure6h + ' hPa') : '近 6 小时基本持平')
       return [
-        { ic: 'gauge', k: '气压', v: W.pressure, u: 'hPa', color: upColor, hint: trendTxt },
+        { ic: 'gauge', k: '气压', v: W.pressure, u: 'hPa' },
         { ic: 'wind', k: '风向 · 风力', v: W.windDir, u: ' ' + W.windLevel, hint: '风速 ' + W.windSpeed + ' m/s' }
       ]
     },
     /**
-     * 气象要素第二组（3 列）：湿度、云量、降水概率（≥60% 高亮警示色）
-     * @returns {Array<{ic, k, v, u, color?}>}
+     * 气象要素第二组（3 列）：湿度、云量、降水量（有降水时高亮警示色）
+     * @returns {Array<{ic, k, v, u, color?, hint?}>}
      */
     metricsMid() {
       const W = this.W
-      const rainColor = W.rainProb >= 60 ? 'var(--c-warn)' : ''
+      const rainfall = W.rainfall != null ? W.rainfall : 0
+      const rainColor = rainfall > 0 ? 'var(--c-warn)' : ''
       return [
         { ic: 'droplet', k: '相对湿度', v: W.humidity, u: '%' },
         { ic: 'cloud', k: '云量', v: W.cloudCover, u: '%' },
-        { ic: 'cloud-rain', k: '降水概率', v: W.rainProb, u: '%', color: rainColor }
+        { ic: 'cloud-rain', k: '降水量', v: rainfall, u: 'mm', color: rainColor, hint: '今日累计' }
       ]
     },
     /**
@@ -487,7 +463,7 @@ export default {
     // ---- 鱼情评分（由后端真实天气 + 大模型/规则引擎生成）----
     /** 总分，缺失时按 0 处理 */
     verdictScore() { return this.V.score != null ? this.V.score : 0 },
-    /** 评分等级名称（如「狂口」），缺失时显示占位符 */
+    /** 评分等级名称（如「连杆」），缺失时显示占位符 */
     verdictLevel() { return this.V.name || '—' },
     /** 是否由大模型生成（false 表示规则引擎兜底），用于标题右侧标注 */
     aiGenerated() { return !!this.V.aiGenerated },
@@ -514,18 +490,18 @@ export default {
     // 按总分取标签色调（与鱼情等级联动）
     /**
      * 分数段对应的标签配色类
-     * @returns {String} ≥88 gold / ≥72 success / ≥58 accent / 其余 mute
+     * @returns {String} ≥90 gold / ≥75 success / ≥56 accent / 其余 mute
      */
     scoreTone() {
       const s = this.verdictScore
-      if (s >= 88) return 'tag--gold'
-      if (s >= 72) return 'tag--success'
-      if (s >= 58) return 'tag--accent'
+      if (s >= 90) return 'tag--gold'
+      if (s >= 75) return 'tag--success'
+      if (s >= 56) return 'tag--accent'
       return 'tag--mute'
     },
     /**
      * AI 出钓建议清单（7 条：钓位 / 钓法 / 饵料 / 线组 / 窗口 / 避让 / 注意）
-     * 其中风向、水温、黄金窗口与温差取自 W，其余为固定文案模板。
+     * 其中风向、黄金窗口与温差取自 W，其余为固定文案模板。
      * @returns {Array<{ic: String, t: String, d: String}>}
      */
     tips() {
@@ -533,7 +509,7 @@ export default {
       return [
         { ic: 'compass', t: '钓位朝向', d: '主攻北岸与东岸背风向阳处；' + W.windDir + '天选下风口缓流湾，水深 1.5-2 米最稳。' },
         { ic: 'target', t: '钓法与钓层', d: '早晚攻浅滩拉饵钓底抢口；午后鱼下潜，改钓深水或离底 20-30cm，信号更实。' },
-        { ic: 'fish', t: '饵料搭配', d: '早口用腥香拉饵（腥六香四）快诱，' + W.waterTemp + '℃水温下腥味穿透更好；午后换谷物本味搓饵，酒米少打勤补。' },
+        { ic: 'fish', t: '饵料搭配', d: '早口用腥香拉饵（腥六香四）快诱；午后换谷物本味搓饵，酒米少打勤补。' },
         { ic: 'ruler', t: '线组配置', d: '主线 1.0 + 子线 0.6、袖钩 4 号、吃铅 1.5g 细长漂；口轻时换 0.4 子线更跟口。' },
         { ic: 'clock', t: '黄金窗口', d: '上午 ' + W.goldenAm + '、下午 ' + W.goldenPm + ' 两段重点作钓，优先占位。' },
         { ic: 'alert-triangle', t: '需避开', d: '11:30-14:00 鱼基本停口，别急着收竿，补窝休息、减少抛竿频率。' },
@@ -544,6 +520,10 @@ export default {
   onLoad() {
     // 首次进入即拉取「今天」的数据
     this.load()
+  },
+  onShow() {
+    // 从登录页 / 选点弹层返回后，若仍处于引导态则重新检查并加载
+    if (this.needLogin || this.needLocation) this.load()
   },
   onUnload() {
     // 离开页面时回退路由栈（由 AppBar 处理），此处无需额外清理
@@ -556,9 +536,29 @@ export default {
      * @returns {void}
      */
     load() {
+      const l = Store.location || {}
+      // 未登录时不发起天气查询，先引导用户登录
+      if (!Store.isLoggedIn) {
+        this.loading = false
+        this.needLogin = true
+        this.needLocation = false
+        this.nowIdx = 0
+        ui.toast('请先登录', 'user')
+        return
+      }
+      // 已登录但没有省/市/区时，不发起天气查询，先引导用户选择位置
+      if (!(l.province || l.city || l.district)) {
+        this.loading = false
+        this.needLogin = false
+        this.needLocation = true
+        this.nowIdx = 0
+        ui.toast('请先选择位置', 'map-pin')
+        return
+      }
+      this.needLogin = false
+      this.needLocation = false
       this.loading = true
       this.nowIdx = 0
-      const l = Store.location
       Api.fetchWeather({
         place: l.province + ' ' + l.city + ' ' + l.district,
         placeDetail: '3 公里范围内野塘',
@@ -594,9 +594,12 @@ export default {
      * @returns {Promise<void>}
      */
     async openLocation() {
-      await ui.locationSheet()
+      const loc = await ui.locationSheet()
+      if (loc) this.needLocation = false
       this.load()
     },
+    /** 跳转登录页 */
+    goLogin() { ui.toLogin() },
     /**
      * 开通会员引导：弹套餐选择，选择后跳会员页；返回 true（已是会员）则重新加载解锁内容
      * @returns {Promise<void>}

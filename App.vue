@@ -677,11 +677,6 @@ input, textarea, button { font-family: inherit; }
 }
 .lock-blur { filter: blur(6px); opacity: .55; pointer-events: none; }
 
-/* ---------- 26. 最近 6 小时气压柱状图 ---------- */
-.pbars { display: flex; align-items: flex-end; gap: 6px; height: 66px; margin-top: 12px; }
-.pbars__i { flex: 1; border-radius: 5px 5px 2px 2px; background: var(--c-primary); }
-.pbars__i.is-last { background: var(--c-accent); }
-
 /* ---------- 27. 文本块级化（小程序 <text> 默认 inline，置于非 flex 容器时需显式块级） ---------- */
 .h1, .h2, .h3,
 .hero__eyebrow, .hero__title, .hero__sub,

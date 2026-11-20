@@ -19,8 +19,8 @@
         </template>
 
         <template v-else>
-          <!-- 区块：个人信息卡 / 头像、昵称、等级、手机号与会员状态
-               布局逻辑：横向排列，文案区自适应；未开通会员时展示开通按钮 -->
+          <!-- 区块：个人信息卡 / 头像、昵称、等级、用户名与会员状态
+               隐私约定：不展示手机号，仅以用户名作为身份标识 -->
           <view class="card card--pad">
             <view class="row" style="gap: 14px; align-items: flex-start">
               <view class="avatar avatar--lg">{{ avatarText }}</view>
@@ -30,8 +30,8 @@
                   <text class="tag tag--primary">{{ USER.level || '--' }}</text>
                 </view>
                 <view class="row tiny mt4" style="gap: 4px">
-                  <AppIcon name="smartphone" :size="12" color="#6E807E" />
-                  <text>{{ phone }}</text>
+                  <AppIcon name="user" :size="12" color="#6E807E" />
+                  <text>{{ username }}</text>
                 </view>
                 <view class="mt8">
                   <text v-if="isMember" class="member-ribbon">
@@ -215,6 +215,14 @@
                 </view>
                 <view class="cell__arrow"><AppIcon name="chevron-right" :size="18" color="#9AA9A7" /></view>
               </view>
+              <view class="cell" @click="bindPhone">
+                <view class="cell__icon"><AppIcon name="smartphone" :size="18" color="#0A6A6C" /></view>
+                <view class="grow">
+                  <text class="cell__t">手机号绑定</text>
+                  <text class="cell__d">{{ phoneBound ? '已绑定，可用于账号找回' : '未绑定，绑定功能即将开放' }}</text>
+                </view>
+                <view class="cell__arrow"><AppIcon name="chevron-right" :size="18" color="#9AA9A7" /></view>
+              </view>
               <view class="cell" @click="notifyOn = !notifyOn">
                 <view class="cell__icon"><AppIcon name="bell" :size="18" color="#0A6A6C" /></view>
                 <view class="grow">
@@ -329,8 +337,10 @@ export default {
     avatarText() { return Store.data.avatarText || '钓' },
     // 昵称，缺省为「钓友」
     nickname() { return Store.data.nickname || '钓友' },
-    // 手机号，缺省展示占位符
-    phone() { return Store.data.phone || '--' },
+    // 用户名：仅作为身份标识展示，缺省提示未设置
+    username() { return Store.data.username || '未设置用户名' },
+    // 手机号绑定状态（仅布尔值，不展示号码）
+    phoneBound() { return !!Store.data.phoneBound },
     // 订单列表（供模板渲染）
     orders() { return this.orders },
     // 我的评论列表（供模板渲染）
@@ -361,6 +371,13 @@ export default {
      * @returns {void}
      */
     go(url) { nav(url) },
+    /**
+     * 手机号绑定入口（预留）：当前仅提示即将开放，后续接入绑定流程即可
+     * @returns {void}
+     */
+    bindPhone() {
+      ui.toast('手机号绑定功能即将开放', 'smartphone')
+    },
     /** 从后端拉取资料并刷新本地身份与资产
      * @returns {void}
      */

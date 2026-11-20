@@ -45,9 +45,10 @@ function defaultConfig() {
 function defaults() {
   return {
     uid: '',
+    username: '',
     nickname: '',
     avatarText: '',
-    phone: '',
+    phoneBound: false,
     loggedIn: false,            // 登录状态（老数据缺省补 false = 未登录）
     isMember: false,
     memberExpire: '',
@@ -106,6 +107,11 @@ function load() {
   } catch (e) { d = defaults() }
   const base = defaults()
   for (const k in base) { if (d[k] === undefined) d[k] = base[k] }
+  // 旧版本缓存中的手机号字段：清理，避免本地继续留存个人敏感信息
+  if ('phone' in d) {
+    delete d.phone
+    writeStorage(KEY, JSON.stringify(d))
+  }
   state.data = d
   // 读取配置缓存
   try {
@@ -230,7 +236,7 @@ const Store = {
   get isLoggedIn() { load(); return !!state.data.loggedIn },
   /**
    * 仅置位登录态（不含用户资料，正式登录请用 setSession）
-   * @param {string} [account] 登录账号（手机号），传入时写入 state.account
+   * @param {string} [account] 登录账号（用户名），传入时写入 state.account
    * @returns {boolean} 恒为 true
    */
   login(account) {
@@ -249,9 +255,10 @@ const Store = {
     load()
     const d = state.data
     if (u.uid) d.uid = u.uid
+    if (u.username !== undefined) d.username = u.username || ''
     if (u.nickname) d.nickname = u.nickname
     if (u.avatarText) d.avatarText = u.avatarText
-    if (u.phone) d.phone = u.phone
+    if (u.phoneBound !== undefined) d.phoneBound = !!u.phoneBound
     if (u.isMember !== undefined) d.isMember = !!u.isMember
     if (u.memberExpire !== undefined) d.memberExpire = u.memberExpire || ''
     if (u.points != null) d.points = u.points

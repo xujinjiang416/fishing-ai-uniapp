@@ -38,13 +38,39 @@
           <view class="hero__body">
             <text class="hero__eyebrow">FishCast · AI 钓鱼助手</text>
             <text class="hero__title">今天去哪甩一杆？</text>
-            <text class="hero__sub">定位已就绪，AI 正在为你研判今日鱼情</text>
+            <text class="hero__sub">{{ heroSub }}</text>
           </view>
         </view>
 
         <view class="page" style="margin-top: -26px; position: relative; z-index: 2">
+          <!-- 区块：未登录引导 / 不发起天气查询，先让用户登录 -->
+          <view v-if="needLogin" class="card card--pad reveal" style="--d: 1; text-align: center">
+            <view class="cell__icon" style="width: 48px; height: 48px; margin: 0 auto 10px; border-radius: 15px">
+              <AppIcon name="user" :size="22" color="#0A6A6C" />
+            </view>
+            <text style="display: block; font-size: 16px; font-weight: 700">请先登录</text>
+            <text class="muted mt4" style="display: block; line-height: 1.6">登录后才能查看对应地点的天气与出钓指数</text>
+            <view class="btn btn--primary btn--block btn--lg mt12" @click="goLogin">
+              <AppIcon name="user" :size="18" color="#FFFFFF" />
+              <text>去登录</text>
+            </view>
+          </view>
+
+          <!-- 区块：已登录但未选点时的引导 / 不发起天气查询，先让用户选择位置 -->
+          <view v-if="needLocation" class="card card--pad reveal" style="--d: 1; text-align: center">
+            <view class="cell__icon" style="width: 48px; height: 48px; margin: 0 auto 10px; border-radius: 15px">
+              <AppIcon name="map-pin" :size="22" color="#0A6A6C" />
+            </view>
+            <text style="display: block; font-size: 16px; font-weight: 700">请先选择位置</text>
+            <text class="muted mt4" style="display: block; line-height: 1.6">未登录时需要先选择省/市/区，才能获取对应地点的天气与出钓指数</text>
+            <view class="btn btn--primary btn--block btn--lg mt12" @click="openLocation">
+              <AppIcon name="crosshair" :size="18" color="#FFFFFF" />
+              <text>选择位置</text>
+            </view>
+          </view>
+
           <!-- 区块：今日概览卡 / 出水色底，左侧指数与 AI 短评，右侧天气要素，底部最佳时段与全预报入口 -->
-          <view class="card card--water card--pad reveal" style="--d: 1">
+          <view v-if="!needLogin && !needLocation" class="card card--water card--pad reveal" style="--d: 1">
             <view class="row row--between" style="align-items: flex-start">
               <view>
                 <text class="tiny" style="color: rgba(255,255,255,.78)">今日出钓指数</text>
@@ -268,6 +294,10 @@ export default {
     return {
       // 首屏加载中标记：true 时渲染骨架屏
       loading: true,
+      // 未登录时置 true：展示登录引导，不发起天气查询
+      needLogin: false,
+      // 已登录但未选点时置 true：展示选点引导，不发起天气查询
+      needLocation: false,
       // 天气实况（condition / temp / pressure / windDir / windLevel 等），来自 fetchWeather
       W: {},
       // 鱼情研判结论（score / name / advice），来自 fetchWeather
@@ -288,8 +318,8 @@ export default {
         {
           feature: 'weather', href: '/pages/weather/weather', icon: 'cloud',
           title: '钓鱼天气查询', badge: 'AI 预报', badgeCls: 'tag--accent',
-          desc: '定位或选城市到区 · 气压/水温/风向全指标 · 全天时段鱼口概率',
-          tags: ['爆户 / 狂口 / 停口', '图片形式结果', '黄金时段提醒'],
+          desc: '定位或选城市到区 · 气压/降水量/风向全指标 · 全天时段鱼口概率',
+          tags: ['爆户 / 连杆 / 停口', '图片形式结果', '黄金时段提醒'],
           lockTitle: '解锁「钓鱼天气查询」', d: 2
         },
         {
@@ -318,7 +348,14 @@ export default {
      */
     locText() {
       const l = Store.location
+      if (!l.city && !l.district) return '选择位置'
       return String(l.city).replace('市', '') + '·' + l.district
+    },
+    /** Hero 副标题：未登录提示登录，未选点提示先选位置 */
+    heroSub() {
+      if (this.needLogin) return '登录后即可查看本地鱼情与出钓指数'
+      if (this.needLocation) return '请先选择位置，AI 才能开始研判本地鱼情'
+      return '定位已就绪，AI 正在为你研判今日鱼情'
     },
     /**
      * Hero 顶部安全区偏移：状态栏高度 + 10px 视觉留白
@@ -385,6 +422,10 @@ export default {
       this.loadAd()
     })
   },
+  onShow() {
+    // 从登录页 / 选点弹层返回后，若仍处于引导态则重新检查并加载
+    if (this.needLogin || this.needLocation) this.load()
+  },
   methods: {
     money,
     /**
@@ -394,8 +435,26 @@ export default {
      * @returns {void}
      */
     load() {
+      const l = Store.location || {}
+      // 未登录时不发起天气查询，先引导用户登录
+      if (!Store.isLoggedIn) {
+        this.loading = false
+        this.needLogin = true
+        this.needLocation = false
+        ui.toast('请先登录', 'user')
+        return
+      }
+      // 已登录但没有省/市/区时，不发起天气查询，先引导用户选择位置
+      if (!(l.province || l.city || l.district)) {
+        this.loading = false
+        this.needLogin = false
+        this.needLocation = true
+        ui.toast('请先选择位置', 'map-pin')
+        return
+      }
+      this.needLogin = false
+      this.needLocation = false
       this.loading = true
-      const l = Store.location
       Api.fetchWeather({
         place: l.province + ' ' + l.city + ' ' + l.district,
         placeDetail: '3 公里范围内野塘'
@@ -427,9 +486,12 @@ export default {
      * @returns {Promise<void>}
      */
     async openLocation() {
-      await ui.locationSheet()
+      const loc = await ui.locationSheet()
+      if (loc) this.needLocation = false
       this.load()
     },
+    /** 跳转登录页 */
+    goLogin() { ui.toLogin() },
     /**
      * 带会员鉴权的功能跳转：未解锁时弹出套餐选择，用户选择后前往会员页
      * @param {String} feature 功能键 weather | spots
