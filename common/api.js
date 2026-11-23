@@ -10,7 +10,7 @@
  * 依赖：State（登录态 / 位置 / 配置 / 收藏缓存）、request（请求与 token）。
  */
 import Store from './state.js'
-import { request, setToken } from './request.js'
+import { request, setToken, upload } from './request.js'
 
 /**
  * 把对象拼成查询串（自动跳过 undefined / null / 空串，值做 URL 编码）
@@ -38,6 +38,17 @@ async function call(path, opts) {
   } catch (e) {
     if (e.business) return { code: e.code, data: e.data, msg: e.message }
     return { code: -1, data: null, msg: (e && e.message) || '网络异常，请稍后重试' }
+  }
+}
+
+/* 上传入口：与 call 相同的返回结构，失败不抛异常（业务错误 / 网络异常都转成 {code,msg}） */
+async function callUpload(path, filePath, opts) {
+  try {
+    const data = await upload(Object.assign({ url: path, filePath }, opts || {}))
+    return { code: 0, data }
+  } catch (e) {
+    if (e.business) return { code: e.code, data: e.data, msg: e.message }
+    return { code: -1, data: null, msg: (e && e.message) || '图片上传失败，请稍后重试' }
   }
 }
 
@@ -122,6 +133,21 @@ const Api = {
     return call('/cities', { auth: false })
   },
 
+  /* GET /api/geo/center?province&city&district -> { coord: "lng,lat" | null } */
+  /**
+   * 查询地区中心坐标（切换地区时先定位地图，再加载钓点）
+   * @param {{province?: string, city?: string, district?: string}} [params]
+   * @returns {Promise<{code: number, data: *, msg?: string}>} data 形如 { coord: 'lng,lat' | null }
+   */
+  async fetchRegionCenter(params) {
+    const p = params || {}
+    return call('/geo/center' + q({
+      province: p.province,
+      city: p.city,
+      district: p.district
+    }), { auth: false, timeout: 8000 })
+  },
+
   /* GET /api/config -> { pointsPerYuan, checkin, ad, plans }（公开接口）
    * 小程序端所有「签到积分 / 广告积分 / 会员套餐」规则都以此为准，页面禁止硬编码。 */
   /**
@@ -193,6 +219,118 @@ const Api = {
    */
   async fetchSpot(id) {
     return call('/spots/' + encodeURIComponent(id), {})
+  },
+
+  /* GET /api/spots/:id/comments?page&page_size -> {list,total,page,pageSize}（不传 page 兼容旧数组） */
+  /**
+   * 分页获取钓点评论
+   * @param {string} spotId 钓点 id
+   * @param {number} page 页码（从 1 开始）
+   * @param {number} [pageSize] 每页条数，缺省 20
+   * @returns {Promise<{code: number, data: *, msg?: string}>} data 为分页对象或数组（旧契约）
+   */
+  async fetchSpotComments(spotId, page, pageSize) {
+    return call('/spots/' + encodeURIComponent(spotId) + '/comments' + q({
+      page: page || 1,
+      page_size: pageSize || 20
+    }), {})
+  },
+
+  /* POST /api/uploads/spot multipart file -> { url }（需登录） */
+  /**
+   * 上传一张图片到本站（投稿 / 评论共用）
+   * @param {string} filePath 本地临时文件路径（uni.chooseImage 返回）
+   * @param {Function} [onProgress] 上传进度回调，参数为 0~100
+   * @returns {Promise<{code: number, data: *, msg?: string}>} data 含 { url }
+   */
+  async uploadSpotImage(filePath, onProgress) {
+    return callUpload('/uploads/spot', filePath, { name: 'file', onProgress })
+  },
+
+  /* POST /api/spot-submissions body:{kind,name,region,coord,address,water,fish[],pay,note,photos[],cover} */
+  /**
+   * 提交钓点投稿
+   * @param {Object} data 投稿字段（kind 固定 new_spot）
+   * @returns {Promise<{code: number, data: *, msg?: string}>} data 为投稿详情
+   */
+  async submitSpot(data) {
+    return call('/spot-submissions', { method: 'POST', data })
+  },
+
+  /* GET /api/spot-submissions/mine -> [submissions] */
+  /**
+   * 我的投稿列表
+   * @returns {Promise<{code: number, data: *, msg?: string}>} data 为投稿数组
+   */
+  async fetchMySubmissions() {
+    return call('/spot-submissions/mine', {})
+  },
+
+  /* GET /api/spot-submissions/:id -> submission */
+  /**
+   * 投稿详情
+   * @param {string} id 投稿 id
+   * @returns {Promise<{code: number, data: *, msg?: string}>}
+   */
+  async fetchSpotSubmission(id) {
+    return call('/spot-submissions/' + encodeURIComponent(id), {})
+  },
+
+  /* POST /api/spot-submissions/:id/withdraw -> submission */
+  /**
+   * 撤回投稿
+   * @param {string} id 投稿 id
+   * @returns {Promise<{code: number, data: *, msg?: string}>}
+   */
+  async withdrawSubmission(id) {
+    return call('/spot-submissions/' + encodeURIComponent(id) + '/withdraw', { method: 'POST' })
+  },
+
+  /* POST /api/spot-submissions/:id/supplement body:{photos?,coord?,note?} -> submission */
+  /**
+   * 补充投稿材料（照片 / 坐标 / 说明）
+   * @param {string} id 投稿 id
+   * @param {{photos?: string[], coord?: string, note?: string}} payload 需要补充的字段
+   * @returns {Promise<{code: number, data: *, msg?: string}>}
+   */
+  async supplementSubmission(id, payload) {
+    return call('/spot-submissions/' + encodeURIComponent(id) + '/supplement', {
+      method: 'POST',
+      data: payload || {}
+    })
+  },
+
+  /* POST /api/spot-reports body:{spot_id,report_type,proposed_coord?,photos[],note?} */
+  /**
+   * 提交钓点纠错 / 举报
+   * @param {{spot_id: string, report_type: string, proposed_coord?: string, photos?: string[], note?: string}} payload 举报字段
+   * @returns {Promise<{code: number, data: *, msg?: string}>}
+   */
+  async reportSpot(payload) {
+    return call('/spot-reports', { method: 'POST', data: payload })
+  },
+
+  /* POST /api/spots/:id/fishability body:{verdict:'yes'|'no'} -> {yes,no,myVote,limit,hidden} */
+  /**
+   * 反馈该钓点是否还能正常作钓（需登录）
+   * @param {string} spotId 钓点 id
+   * @param {'yes'|'no'} verdict yes=可以作钓 / no=无法作钓
+   * @returns {Promise<{code: number, data: *, msg?: string}>} data 含 yes/no/myVote/limit/hidden
+   */
+  async reportFishability(spotId, verdict) {
+    return call('/spots/' + encodeURIComponent(spotId) + '/fishability', {
+      method: 'POST',
+      data: { verdict }
+    })
+  },
+
+  /* GET /api/spot-reports/mine -> [reports] */
+  /**
+   * 我的纠错记录
+   * @returns {Promise<{code: number, data: *, msg?: string}>}
+   */
+  async fetchMyReports() {
+    return call('/spot-reports/mine', {})
   },
 
   /* POST /api/spots/:id/comments body:{text,images[],rating} -> { comment } */

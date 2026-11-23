@@ -318,7 +318,8 @@ export default {
         { ic: 'crown', t: '会员中心', url: '/pages/membership/membership' },
         { ic: 'calendar-check', t: '每日签到', url: '/pages/checkin/checkin' },
         { ic: 'play-circle', t: '看广告赚积分', url: '/pages/earn/earn' },
-        { ic: 'bookmark', t: '我的收藏', act: 'fav' }
+        { ic: 'bookmark', t: '我的收藏', url: '/pages/favorites/favorites' },
+        { ic: 'camera', t: '我的投稿', url: '/pages/my-submissions/my-submissions' }
       ]
     }
   },

@@ -43,7 +43,7 @@
                 "desc" : "你的位置信息将用于查找附近的钓点与本地气象"
             }
         },
-        "requiredPrivateInfos" : [ "getLocation" ],
+        "requiredPrivateInfos" : [ "getLocation", "chooseLocation" ],
         "lazyCodeLoading" : "requiredComponents"
     },
     "h5" : {

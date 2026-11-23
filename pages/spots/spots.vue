@@ -1,7 +1,15 @@
 <template>
   <view class="app map-page">
     <view class="app-main map-main">
-      <AppBar title="钓点" back solid right="定位" @right="locate" />
+      <AppBar title="钓点" back solid>
+        <template #right>
+          <view class="loc-pill loc-pill--bar" @click="openLocation">
+            <AppIcon name="crosshair" :size="14" color="#0F8B8D" />
+            <text class="loc-pill__txt">{{ locText }}</text>
+            <AppIcon name="chevron-down" :size="13" color="#6E807E" />
+          </view>
+        </template>
+      </AppBar>
 
       <!-- 区块：地图容器 / 全屏铺满，瓦片与标记共用同一图层，拖拽时整体位移 -->
       <view class="map-wrap">
@@ -129,6 +137,12 @@
             <text>查看钓点详情</text>
           </view>
         </view>
+
+        <!-- 区块：上报钓点悬浮按钮 / 点击进入投稿表单（登录守卫由 nav 处理） -->
+        <view v-if="!selected" class="report-fab" @click="goSubmit">
+          <AppIcon name="plus" :size="17" color="#FFFFFF" />
+          <text>上报钓点</text>
+        </view>
       </view>
 
       <AppTabBar page="spots" />
@@ -140,7 +154,7 @@
 <script>
 /* 钓点地图（底部 Tab 页，无路由参数）
  * 数据接口：Api.fetchSpots({ keyword, province, city, district })；定位取自 Store.location
- * 关键交互：地图拖拽 / 双指或按钮缩放 / 全览所有标记 / 定位当前位置 / 搜索 / 点击标记看详情
+ * 关键交互：地图拖拽 / 双指或按钮缩放 / 全览所有标记 / 顶栏地区选择（与首页同一套省市区弹层） / 搜索 / 点击标记看详情
  * 实现说明：
  *   - 使用高德路网栅格瓦片（GCJ-02）自绘地图，不依赖地图 SDK Key，H5 与小程序表现一致；
  *   - 钓点坐标为 GCJ-02（高德 POI 原生、OSM 已在后端转换），与瓦片坐标系一致；
@@ -203,7 +217,10 @@ export default {
       pinchStart: 0, // 双指缩放基准间距
       moved: false, // 本次触摸是否发生了拖动（用于区分拖动与点击）
       needsFit: false, // 数据就绪后是否需要自动全览一次（尺寸测量完成后执行）
-      selected: null // 当前打开的钓点
+      selected: null, // 当前打开的钓点
+      reqSeq: 0, // 地区切换序号：丢弃过期的钓点响应
+      loadedSeq: 0, // 已完成全览的地区序号（用于避免地区中心回包覆盖全览）
+      loadedRegion: '' // 最近一次加载钓点的地区标识，onShow 时判断是否切换过地区
     }
   },
   computed: {
@@ -213,6 +230,13 @@ export default {
     placeText() {
       const l = Store.location || {}
       return (l.city || '') + (l.district || '') || '附近'
+    },
+    /** 顶栏地区胶囊文案：与首页一致，形如「合肥·蜀山」 */
+    locText() {
+      const l = Store.location || {}
+      if (!l.city && !l.district) return '选择位置'
+      const city = String(l.city || '').replace('市', '')
+      return l.district ? city + '·' + l.district : city
     },
     /** 当前缩放级别下整个世界的像素宽度 */
     worldSize() { return TILE_SIZE * Math.pow(2, this.z) },
@@ -280,11 +304,22 @@ export default {
     }
   },
   onLoad() {
+    this.reqSeq = 1
+    this.focusRegion(this.reqSeq, Store.location || {})
     this.fetchSpots()
   },
-  /** 从详情页返回时静默刷新，保留当前地图视角 */
+  /** 从详情页返回时静默刷新；若在其它页面切换过地区则先切地图、再全量加载 */
   onShow() {
-    if (this.loaded) this.fetchSpots(true)
+    if (!this.loaded) return
+    if (this.regionKey(Store.location || {}) !== this.loadedRegion) {
+      this.reqSeq += 1
+      this.ALL = []
+      this.selected = null
+      this.focusRegion(this.reqSeq, Store.location || {})
+      this.fetchSpots()
+      return
+    }
+    this.fetchSpots(true)
   },
   mounted() {
     this.$nextTick(this.measure)
@@ -336,18 +371,50 @@ export default {
       this.fitAll()
     },
     /**
+     * 地区标识：用于判断 onShow 时是否切换过地区
+     * @param {Object} loc 地区对象 { province, city, district }
+     * @returns {string}
+     */
+    regionKey(loc) {
+      return [loc.province || '', loc.city || '', loc.district || ''].join('|')
+    },
+    /**
+     * 先按地区中心切换地图（不等待钓点数据），钓点回包后再自动全览
+     * @param {number} seq 地区切换序号
+     * @param {Object} loc 地区对象 { province, city, district }
+     * @returns {void}
+     */
+    focusRegion(seq, loc) {
+      Api.fetchRegionCenter({
+        province: loc.province,
+        city: loc.city,
+        district: loc.district
+      }).then(res => {
+        // 地区已再次切换，或钓点已加载并完成全览时，不再覆盖视角
+        if (seq !== this.reqSeq || this.loadedSeq === seq) return
+        if (res.code !== 0 || !res.data) return
+        const c = this.parseCoord(res.data.coord)
+        if (!c) return
+        this.center = c
+        if (this.z < 12) this.z = 12
+      })
+    },
+    /**
      * 拉取钓点数据
      * @param {boolean} silent 静默刷新：保留地图视角，不展示加载态
      */
     fetchSpots(silent) {
-      if (!silent) this.loading = true
+      const seq = this.reqSeq
       const loc = Store.location || {}
+      if (!silent) this.loading = true
       Api.fetchSpots({
         keyword: this.keyword,
         province: loc.province,
         city: loc.city,
         district: loc.district
       }).then(res => {
+        // 请求期间已切换地区，丢弃旧地区的响应
+        if (seq !== this.reqSeq) return
         if (!silent) this.loading = false
         if (res.code !== 0 || !res.data) {
           if (res.code !== 0) ui.toast(res.msg || '钓点加载失败', 'alert-triangle')
@@ -355,6 +422,8 @@ export default {
         }
         this.ALL = res.data
         this.loaded = true
+        this.loadedSeq = seq
+        this.loadedRegion = this.regionKey(loc)
         // 刷新后保持已选钓点的最新对象；不存在则关闭卡片
         if (this.selected) {
           const id = this.selected.id
@@ -410,17 +479,20 @@ export default {
       this.z = z
       this.center = { lng: xToLng(cx, world), lat: yToLat(cy, world) }
     },
-    /** 定位当前位置（GCJ-02，与底图一致） */
-    locate() {
-      uni.getLocation({
-        type: 'gcj02',
-        success: res => {
-          this.center = { lat: res.latitude, lng: res.longitude }
-          if (this.z < 14) this.z = 14
-          ui.toast('已定位到当前位置', 'crosshair')
-        },
-        fail: () => ui.toast('定位失败，请检查定位权限', 'alert-triangle')
-      })
+    /**
+     * 打开地区选择弹层（与首页同一套省市区选择）：
+     * 确认后先按地区中心切换地图，再异步加载该地区钓点
+     * @returns {Promise<void>}
+     */
+    async openLocation() {
+      const loc = await ui.locationSheet()
+      if (!loc) return
+      this.reqSeq += 1
+      this.ALL = []
+      this.selected = null
+      this.keyword = ''
+      this.focusRegion(this.reqSeq, loc)
+      this.fetchSpots()
     },
     /** 点击标记：打开钓点卡片 */
     selectSpot(m) {
@@ -437,6 +509,8 @@ export default {
     },
     /** 打开钓点详情页 */
     openSpot(id) { nav('/pages/spot-detail/spot-detail?id=' + encodeURIComponent(id)) },
+    /** 上报钓点：未登录时由 nav 自动跳登录页 */
+    goSubmit() { nav('/pages/spot-submit/spot-submit') },
     /** 会员解锁：成功后重新加载并显示标记 */
     async unlock() {
       const ok = await ui.requireUnlock({
@@ -547,6 +621,25 @@ export default {
 <style>
 /* 搜索框占位文案 */
 .ph { color: var(--c-ink-4); font-size: 14px; }
+
+/* 顶栏地区胶囊：沿用首页 loc-pill 结构，浅色标题栏下改为浅青底 + 深色字 */
+.loc-pill.loc-pill--bar {
+  height: 30px;
+  padding: 0 10px;
+  gap: 5px;
+  background: var(--c-primary-l);
+  border: 1px solid rgba(15, 139, 141, .16);
+  color: var(--c-primary-d);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: none;
+}
+.loc-pill__txt {
+  max-width: 96px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 /* 页面骨架：整屏地图，顶部标题栏 + 底部 TabBar 之间铺满 */
 .map-page { min-height: 100vh; overflow: hidden; }
@@ -795,6 +888,26 @@ export default {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+
+/* 上报钓点悬浮按钮：位于详情卡片之外时展示 */
+.report-fab {
+  position: absolute;
+  right: 12px;
+  bottom: 14px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  background: var(--grad-dawn);
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 18px rgba(255, 122, 61, .32);
+}
+.report-fab:active { transform: scale(.97); }
 
 /* 桌面端：地图页保持手机栏宽居中，卡片不贴屏幕两侧 */
 @media (min-width: 600px) {

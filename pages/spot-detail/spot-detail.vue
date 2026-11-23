@@ -40,7 +40,7 @@
                   :key="i"
                   class="gs-item"
                   :class="{ 'is-on': i === gi }"
-                  :src="g"
+                  :src="imgUrl(g)"
                   mode="aspectFill"
                   @click="gi = i"
                 />
@@ -99,6 +99,35 @@
             </view>
           </view>
 
+          <!-- 区块：钓况反馈 / 是否可正常作钓，同一用户可改选；5 人反馈无法作钓后该钓点不再展示 -->
+          <view class="card card--pad reveal mt12">
+            <view class="card__title">
+              <AppIcon name="users" :size="16" color="#12211F" />
+              <text>这里还能正常作钓吗</text>
+            </view>
+            <view class="row mt12" style="gap: 8px">
+              <view
+                class="chip vote-btn"
+                :class="{ 'is-on': fishability.myVote === 'yes' }"
+                @click="voteFishable('yes')"
+              >
+                <AppIcon name="circle-check" :size="14" :color="fishability.myVote === 'yes' ? '#FFFFFF' : '#0A6A6C'" />
+                <text>可以作钓</text>
+                <text class="vote-btn__n">{{ fishability.yes }}</text>
+              </view>
+              <view
+                class="chip vote-btn vote-btn--no"
+                :class="{ 'is-on': fishability.myVote === 'no' }"
+                @click="voteFishable('no')"
+              >
+                <AppIcon name="x" :size="14" :color="fishability.myVote === 'no' ? '#FFFFFF' : '#B4453A'" />
+                <text>无法作钓</text>
+                <text class="vote-btn__n">{{ fishability.no }}</text>
+              </view>
+            </view>
+            <text class="tiny mt8" style="display: block">{{ fishabilityHint }}</text>
+          </view>
+
           <!-- 区块：位置与导航 / 地址与坐标文本 + 复制、导航两个等宽按钮 / 坐标与地址拼接后写入剪贴板 -->
           <view class="section">
             <view class="section__head">
@@ -123,6 +152,12 @@
                   <text>立即导航</text>
                 </view>
               </view>
+            </view>
+            <!-- 纠错 / 举报入口：位置、禁钓、干涸、收费等异常信息 -->
+            <view class="report-link" @click="openReport">
+              <AppIcon name="alert-triangle" :size="13" color="#8E6210" />
+              <text class="grow">信息有误？纠错 / 举报</text>
+              <AppIcon name="chevron-right" :size="12" color="#8E6210" />
             </view>
           </view>
 
@@ -172,7 +207,7 @@
                   class="card sim-card"
                   @click="openSpot(s.id)"
                 >
-                  <image v-if="s.cover" class="sim-card__img" :src="s.cover" mode="aspectFill" />
+                  <image v-if="s.cover" class="sim-card__img" :src="imgUrl(s.cover)" mode="aspectFill" />
                   <view v-else class="sim-card__ph"><AppIcon name="image" :size="22" color="#FFFFFF" /></view>
                   <view style="padding: 9px 10px 11px">
                     <text class="ellipsis" style="font-weight: 600; font-size: 13px; display: block">{{ s.name }}</text>
@@ -190,7 +225,7 @@
           <view class="section">
             <view class="section__head">
               <view class="section__title"><text>钓友评价</text></view>
-              <text class="tiny">共 {{ S.commentCount }} 条</text>
+              <text class="tiny">共 {{ commentsTotal }} 条</text>
             </view>
             <view class="card card--pad">
               <view class="row row--between">
@@ -212,7 +247,7 @@
                 <AppIcon name="chevron-right" :size="16" color="#9AA9A7" />
               </view>
               <view class="mt8">
-                <view v-if="!S.comments.length" class="empty" style="padding: 26px 10px">
+                <view v-if="!commentsLoading && !S.comments.length" class="empty" style="padding: 26px 10px">
                   <view class="empty__ic"><AppIcon name="message-circle" :size="24" color="#9AA9A7" /></view>
                   <text style="font-size: 13px; color: var(--c-ink-3)">还没有评价，来发第一条</text>
                 </view>
@@ -229,7 +264,7 @@
                         v-for="(im, ii) in c.images"
                         :key="ii"
                         class="ci"
-                        :src="im"
+                        :src="imgUrl(im)"
                         mode="aspectFill"
                         @click="previewComment(c.images, ii)"
                       />
@@ -243,6 +278,12 @@
                     </view>
                   </view>
                 </view>
+
+                <!-- 评论分页：还有更多时展示加载按钮；全部加载完提示到底 -->
+                <view v-if="commentsHasMore || commentsLoading" class="load-more mt12" @click="loadMoreComments">
+                  <text>{{ commentsLoading ? '加载中…' : '加载更多评论' }}</text>
+                </view>
+                <text v-else-if="S.comments.length" class="tiny mt12" style="display: block; text-align: center">已经到底啦</text>
               </view>
             </view>
           </view>
@@ -295,12 +336,61 @@
             <text>添加图片</text>
           </view>
         </view>
+        <text v-if="uploadTip" class="tiny mt8" style="display: block">{{ uploadTip }}</text>
         <view class="notice notice--info mt12">
           <AppIcon name="info" :size="15" color="#0A6A6C" />
           <text class="grow">带实景图的评价会被优先展示，也可能成为该钓点的封面图。</text>
         </view>
         <view class="btn btn--accent btn--block btn--lg mt12" :class="{ 'is-loading': submitting }" @click="submit">
           <text>发布评价</text>
+        </view>
+      </view>
+    </template>
+
+    <!-- 区块：纠错 / 举报弹层 / 选择问题类型，位置不对时可填新坐标 -->
+    <template v-if="reportOpen">
+      <view class="mask" @click="reportOpen = false"></view>
+      <view class="sheet">
+        <view class="row row--between" style="margin-bottom: 10px">
+          <text class="sheet__title" style="margin: 0">纠错 / 举报</text>
+          <view class="appbar__btn" @click="reportOpen = false">
+            <AppIcon name="x" :size="16" color="#12211F" />
+          </view>
+        </view>
+        <text class="tiny">选择问题类型</text>
+        <view class="chips mt8">
+          <view
+            v-for="t in reportTypes"
+            :key="t.key"
+            class="chip"
+            :class="{ 'is-on': reportType === t.key }"
+            @click="reportType = t.key"
+          >
+            <text>{{ t.label }}</text>
+          </view>
+        </view>
+
+        <text v-if="reportType === 'wrong_location'" class="form-label mt16">新位置坐标（lng,lat）</text>
+        <view v-if="reportType === 'wrong_location'" class="row" style="gap: 8px">
+          <input v-model="reportCoord" class="input grow" placeholder="如 117.227200,31.820600" placeholder-class="ph" />
+          <view class="btn btn--line btn--sm" @click="pickReportCoord">选点</view>
+        </view>
+
+        <text class="form-label mt16">补充说明（选填）</text>
+        <textarea
+          v-model="reportNote"
+          class="textarea"
+          maxlength="500"
+          placeholder="描述发现的问题，便于管理员核实"
+          placeholder-class="ph"
+        />
+
+        <view class="notice notice--warn mt12">
+          <AppIcon name="shield-check" :size="15" color="#8E6210" />
+          <text class="grow">提交后会进入人工核实，恶意举报可能影响账号信用。</text>
+        </view>
+        <view class="btn btn--accent btn--block btn--lg mt12" :class="{ 'is-loading': reportSubmitting }" @click="submitReport">
+          <text>提交</text>
         </view>
       </view>
     </template>
@@ -327,6 +417,7 @@ import Api from '../../common/api.js'
 import Store from '../../common/state.js'
 import * as ui from '../../common/ui.js'
 import { nav } from '../../common/nav.js'
+import { mediaUrl } from '../../common/request.js'
 import { ratingText } from '../../common/utils.js'
 
 export default {
@@ -344,7 +435,30 @@ export default {
       rating: 5, // 打星评分，取值 1~5
       text: '', // 评价正文，最长 300 字
       picks: [], // 待上传实景图临时路径，最多 3 张
-      submitting: false // 发布请求中，防止重复提交
+      submitting: false, // 发布请求中，防止重复提交
+      uploadTip: '', // 评论图片上传进度文案
+      // 评论分页：首次 page=1，触底 / 按钮继续加载
+      commentsPage: 1,
+      commentsTotal: 0,
+      commentsHasMore: false,
+      commentsLoading: false,
+      // 纠错 / 举报弹层
+      reportOpen: false,
+      reportType: '',
+      reportNote: '',
+      reportCoord: '',
+      reportSubmitting: false,
+      // 钓况反馈：yes/no 人数、当前用户投票（同一用户可改选）
+      fishability: { yes: 0, no: 0, myVote: null, limit: 5 },
+      voting: false,
+      reportTypes: [
+        { key: 'wrong_location', label: '位置不对' },
+        { key: 'prohibited', label: '已禁钓' },
+        { key: 'dry', label: '已干涸' },
+        { key: 'fee_changed', label: '收费变化' },
+        { key: 'duplicate', label: '重复' },
+        { key: 'other', label: '其他' }
+      ]
     }
   },
   computed: {
@@ -356,10 +470,10 @@ export default {
       if (S.gallery && S.gallery.length) return S.gallery
       return S.cover ? [S.cover] : []
     },
-    /** 当前大图地址，索引越界时返回空串（模板走占位块）
+    /** 当前大图地址（相对路径补全），索引越界时返回空串（模板走占位块）
      * @returns {string}
      */
-    heroImg() { return this.gallery[this.gi] || '' },
+    heroImg() { return this.imgUrl(this.gallery[this.gi] || '') },
     /** 封面来源：'comment' 评论实景 / 'none' 无图 / '' 官方实景
      * @returns {string}
      */
@@ -407,6 +521,14 @@ export default {
       let n = 0
       ;(this.S.comments || []).forEach(c => { if (c.images) n += c.images.length })
       return n
+    },
+    /** 钓况反馈提示文案：展示当前「无法作钓」人数与触发隐藏的剩余人数 */
+    fishabilityHint() {
+      const f = this.fishability || {}
+      if (!f.no) return '还没有钓友反馈，欢迎投票帮助其他钓友判断'
+      const left = Math.max(0, (f.limit || 5) - f.no)
+      if (!left) return '已有 ' + f.no + ' 位钓友反馈无法作钓，该钓点将不再展示'
+      return '已有 ' + f.no + ' 位钓友反馈无法作钓，再有 ' + left + ' 人反馈将不再展示'
     }
   },
   /**
@@ -416,6 +538,10 @@ export default {
   onLoad(options) {
     this.spotId = (options && options.id) || 's1'
     this.load()
+  },
+  /** 触底自动加载下一页评论 */
+  onReachBottom() {
+    this.loadMoreComments()
   },
   methods: {
     // 模板中使用的 utils 函数必须挂到 methods：小程序端非内联渲染无法直接访问模块内导入
@@ -436,14 +562,71 @@ export default {
      */
     load() {
       this.loading = true
-      Promise.all([Api.fetchSpot(this.spotId), Api.fetchSpots({})]).then(res => {
+      Promise.all([
+        Api.fetchSpot(this.spotId),
+        Api.fetchSpots({}),
+        Api.fetchSpotComments(this.spotId, 1, 20)
+      ]).then(res => {
         if (res[0].code !== 0 || !res[0].data) { this.loading = false; ui.toast(res[0].msg || '钓点加载失败', 'alert-triangle'); return }
         this.S = res[0].data
+        // 钓况反馈统计（yes/no 人数 + 当前用户投票）
+        this.fishability = res[0].data.fishability || { yes: 0, no: 0, myVote: null, limit: 5 }
+        // 详情接口已带评论，先以它为兜底；评论分页接口成功后覆盖第一页
+        this.applyComments(res[2], 1)
+        // 同步收藏状态到本地，保证收藏按钮与后端一致
+        if (this.S.favorited != null) Store.setFavorite(this.S.id, !!this.S.favorited)
         // 相似钓点：排除当前钓点后取前 3 条（不再按距离排序）
         const list = (res[1].data || []).filter(x => x.id !== this.S.id)
         this.similar = list.slice(0, 3)
         this.loading = false
       })
+    },
+    /** 图片地址补全（本地 /static/uploads 相对路径 -> 服务端绝对地址） */
+    imgUrl(u) { return mediaUrl(u) },
+    /**
+     * 应用评论接口结果（兼容旧数组契约）
+     * @param {{code:number,data:*}} res 评论接口返回
+     * @param {number} page 请求页码
+     */
+    applyComments(res, page) {
+      const fallback = (this.S && this.S.comments) || []
+      if (res.code !== 0 || !res.data) {
+        if (page === 1) {
+          this.S.comments = fallback
+          this.commentsTotal = fallback.length
+          this.commentsHasMore = false
+        }
+        return
+      }
+      if (Array.isArray(res.data)) {
+        this.S.comments = res.data.slice()
+        this.commentsPage = 1
+        this.commentsTotal = res.data.length
+        this.commentsHasMore = false
+        return
+      }
+      const list = res.data.list || []
+      if (page === 1) {
+        this.S.comments = list.slice()
+      } else {
+        // 追加时按 id 去重：期间新发评论会让后端偏移量后移，避免出现重复项
+        const cur = this.S.comments || []
+        const seen = {}
+        cur.forEach(c => { seen[c.id] = 1 })
+        this.S.comments = cur.concat(list.filter(c => !seen[c.id]))
+      }
+      this.commentsPage = res.data.page || page
+      this.commentsTotal = res.data.total != null ? res.data.total : this.S.comments.length
+      this.commentsHasMore = this.S.comments.length < this.commentsTotal
+    },
+    /** 加载更多评论（底部按钮 / 触底） */
+    async loadMoreComments() {
+      if (this.commentsLoading || !this.commentsHasMore) return
+      this.commentsLoading = true
+      const res = await Api.fetchSpotComments(this.spotId, this.commentsPage + 1, 20)
+      this.commentsLoading = false
+      if (res.code !== 0) { ui.toast(res.msg || '评论加载失败', 'alert-triangle'); return }
+      this.applyComments(res, this.commentsPage + 1)
     },
     /**
      * 预览图集大图
@@ -451,7 +634,8 @@ export default {
      */
     previewImage(i) {
       if (!this.gallery.length) return
-      uni.previewImage({ urls: this.gallery, current: this.gallery[i] })
+      const urls = this.gallery.map(mediaUrl)
+      uni.previewImage({ urls, current: urls[i] })
     },
     /**
      * 预览单条评论的实景图
@@ -459,22 +643,45 @@ export default {
      * @param {number} i 起始索引
      */
     previewComment(images, i) {
-      uni.previewImage({ urls: images, current: images[i] })
+      const urls = (images || []).map(mediaUrl)
+      uni.previewImage({ urls, current: urls[i] })
     },
-    /** 切换收藏状态，成功按结果提示，失败保留原状态 */
+    /** 切换收藏状态，成功按结果提示并同步本地 Store */
     toggleFav() {
       Api.toggleFavorite(this.S.id).then(res => {
         if (res.code !== 0) { ui.toast(res.msg || '操作失败，请重试', 'alert-triangle'); return }
-        ui.toast(res.data.favorited ? '已收藏该钓点' : '已取消收藏', 'heart')
+        const on = !!res.data.favorited
+        Store.setFavorite(this.S.id, on)
+        this.S.favorited = on
+        ui.toast(on ? '已收藏该钓点' : '已取消收藏', 'heart')
       })
     },
     /** 复制「地址 + 坐标」，便于粘贴到第三方地图搜索 */
     copyLoc() {
       ui.copy(this.S.address + ' ' + this.S.coord, '已复制，可粘贴到高德 / 百度 / 腾讯地图导航')
     },
-    /** 唤起导航：原型阶段仅提示，不调起真实地图 App */
+    /** 解析 "lng,lat" 坐标串 */
+    parseCoord(coord) {
+      const parts = String(coord || '').split(',')
+      if (parts.length !== 2) return null
+      const lng = Number(parts[0])
+      const lat = Number(parts[1])
+      if (!isFinite(lng) || !isFinite(lat)) return null
+      if (lng < -180 || lng > 180 || lat < -90 || lat > 90) return null
+      return { lng, lat }
+    },
+    /** 唤起系统地图导航 */
     doNav() {
-      ui.toast('已唤起地图导航（原型演示）', 'navigation')
+      const p = this.parseCoord(this.S.coord)
+      if (!p) { ui.toast('该钓点暂无有效坐标，无法导航', 'alert-triangle'); return }
+      uni.openLocation({
+        latitude: p.lat,
+        longitude: p.lng,
+        name: this.S.name || '钓点',
+        address: this.S.address || '',
+        scale: 16,
+        fail: () => ui.toast('打开导航失败，请检查定位权限或地图应用', 'alert-triangle')
+      })
     },
     /**
      * 评论点赞 / 取消点赞
@@ -501,6 +708,76 @@ export default {
         featureLabel: '钓鱼天气查询'
       })
       if (ok) nav('/pages/weather/weather')
+    },
+    /**
+     * 反馈是否可正常作钓（同一用户可改选）
+     * 达到阈值后后端会返回 hidden=true，提示该钓点将不再展示
+     * @param {'yes'|'no'} verdict yes=可以作钓 / no=无法作钓
+     */
+    async voteFishable(verdict) {
+      if (this.voting) return
+      if (!Store.isLoggedIn) { ui.toast('登录后才能反馈钓况', 'alert-triangle'); ui.toLogin(); return }
+      if (this.fishability.myVote === verdict) return
+      this.voting = true
+      const res = await Api.reportFishability(this.S.id, verdict)
+      this.voting = false
+      if (res.code !== 0 || !res.data) { ui.toast(res.msg || '反馈失败，请重试', 'alert-triangle'); return }
+      this.fishability = {
+        yes: res.data.yes || 0,
+        no: res.data.no || 0,
+        myVote: res.data.myVote || verdict,
+        limit: res.data.limit || 5
+      }
+      if (res.data.hidden) ui.toast('已有 5 位钓友反馈无法作钓，该钓点将不再展示', 'alert-triangle')
+      else ui.toast(verdict === 'no' ? '已反馈无法作钓' : '已反馈可以作钓', 'circle-check')
+    },
+    /** 打开纠错 / 举报弹层（默认不选类型，需用户主动选择） */
+    openReport() {
+      this.reportType = ''
+      this.reportNote = ''
+      this.reportCoord = ''
+      this.reportOpen = true
+    },
+    /** 位置纠错时用地图选点回填新坐标 */
+    pickReportCoord() {
+      if (typeof uni.chooseLocation !== 'function') {
+        ui.toast('当前环境不支持地图选点，请手动填写坐标', 'alert-triangle')
+        return
+      }
+      uni.chooseLocation({
+        success: res => {
+          const lng = Number(res.longitude)
+          const lat = Number(res.latitude)
+          if (!isFinite(lng) || !isFinite(lat)) { ui.toast('选点坐标无效，请重试', 'alert-triangle'); return }
+          this.reportCoord = lng.toFixed(6) + ',' + lat.toFixed(6)
+        },
+        fail: () => ui.toast('地图选点未完成，可手动填写坐标', 'alert-triangle')
+      })
+    },
+    /** 提交纠错 / 举报 */
+    async submitReport() {
+      if (this.reportSubmitting) return
+      if (!this.reportType) { ui.toast('请选择问题类型', 'alert-triangle'); return }
+      const coord = String(this.reportCoord || '').replace(/，/g, ',').trim()
+      if (this.reportType === 'wrong_location') {
+        if (!this.parseCoord(coord)) { ui.toast('请填写有效的新坐标（lng,lat）', 'alert-triangle'); return }
+      }
+      this.reportSubmitting = true
+      const payload = {
+        spot_id: this.S.id,
+        report_type: this.reportType,
+        photos: [],
+        note: String(this.reportNote || '').trim()
+      }
+      if (this.reportType === 'wrong_location' && coord) payload.proposed_coord = coord
+      const res = await Api.reportSpot(payload)
+      this.reportSubmitting = false
+      if (res.code !== 0) { ui.toast(res.msg || '提交失败，请重试', 'alert-triangle'); return }
+      this.reportOpen = false
+      this.reportType = ''
+      this.reportNote = ''
+      this.reportCoord = ''
+      ui.toast('已提交，感谢你的反馈', 'circle-check')
     },
     /**
      * 选择实景图，按剩余名额（3 - 已选）限制单次可选数量
@@ -531,30 +808,47 @@ export default {
      * 发布评价：校验正文非空且未在提交中 → 提交 → 本地插入评论并同步计数
      * 该塘原本无实景图时，首图会回填为封面（与后端规则保持一致）
      */
-    submit() {
+    async submit() {
       const text = String(this.text || '').trim()
       if (!text) { ui.toast('请先填写评价内容', 'alert-triangle'); return }
       if (this.submitting) return
       this.submitting = true
-      Api.postComment(this.S.id, { text, images: this.picks.slice(), rating: this.rating }).then(res => {
-        this.submitting = false
-        if (res.code !== 0 || !res.data) { ui.toast(res.msg || '评论发布失败，请重试', 'alert-triangle'); return }
-        const c = res.data
-        this.S.comments.unshift(c)
-        this.S.commentCount = (this.S.commentCount || 0) + 1
-        this.likes[c.id] = 0
-        // 该塘原本没有实景图时，这条评论的图会成为封面（与后端 post_comment 的规则一致）
-        if ((!this.S.cover || this.S.coverFrom === 'none') && c.images && c.images.length) {
-          this.S.cover = c.images[0]
-          this.S.coverFrom = 'comment'
-          this.S.gallery = [c.images[0]]
+      // 先逐张上传本地图片，拿到 /static 地址后再发布评论
+      const images = []
+      for (let i = 0; i < this.picks.length; i++) {
+        this.uploadTip = '图片上传中 ' + (i + 1) + '/' + this.picks.length
+        const up = await Api.uploadSpotImage(this.picks[i], percent => {
+          this.uploadTip = '图片上传中 ' + (i + 1) + '/' + this.picks.length + ' · ' + percent + '%'
+        })
+        if (up.code !== 0 || !up.data || !up.data.url) {
+          this.submitting = false
+          this.uploadTip = ''
+          ui.toast(up.msg || '图片上传失败，请重试', 'alert-triangle')
+          return
         }
-        this.publishOpen = false
-        this.text = ''
-        this.picks = []
-        this.rating = 5
-        ui.toast('评论发布成功', 'circle-check')
-      })
+        images.push(up.data.url)
+      }
+      this.uploadTip = ''
+      const res = await Api.postComment(this.S.id, { text, images, rating: this.rating })
+      this.submitting = false
+      if (res.code !== 0 || !res.data) { ui.toast(res.msg || '评论发布失败，请重试', 'alert-triangle'); return }
+      const c = res.data
+      if (!Array.isArray(this.S.comments)) this.S.comments = []
+      this.S.comments.unshift(c)
+      this.S.commentCount = (this.S.commentCount || 0) + 1
+      this.commentsTotal = (this.commentsTotal || 0) + 1
+      this.likes[c.id] = 0
+      // 该塘原本没有实景图时，这条评论的图会成为封面（与后端 post_comment 的规则一致）
+      if ((!this.S.cover || this.S.coverFrom === 'none') && c.images && c.images.length) {
+        this.S.cover = c.images[0]
+        this.S.coverFrom = 'comment'
+        this.S.gallery = [c.images[0]]
+      }
+      this.publishOpen = false
+      this.text = ''
+      this.picks = []
+      this.rating = 5
+      ui.toast('评论发布成功', 'circle-check')
     }
   }
 }
@@ -570,4 +864,26 @@ export default {
 .sim-card__ph { width: 100%; height: 92px; background: var(--grad-water); display: flex; align-items: center; justify-content: center; }
 /* 弹层内文本域：改用二级背景，与抽屉底色区分 */
 .sheet .textarea { background: var(--c-surface-2); }
+/* 纠错入口：暖色提示条，弱化但可发现 */
+.report-link {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 10px; padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: #FCF3E0; color: #8E6210;
+  font-size: 12px;
+}
+/* 评论加载更多 */
+.load-more {
+  display: flex; align-items: center; justify-content: center;
+  height: 40px; border-radius: var(--r-pill);
+  background: var(--c-primary-l); color: var(--c-primary-d);
+  font-size: 13px; font-weight: 600;
+}
+/* 钓况反馈：两个结论按钮用不同主色，选中后整块反白 */
+.vote-btn { gap: 5px; }
+.vote-btn__n { font-weight: 700; opacity: .78; }
+.chip.vote-btn--no.is-on { background: #B4453A; border-color: #B4453A; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.form-label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--c-ink-2); }
+.ph { color: var(--c-ink-4); }
 </style>

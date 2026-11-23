@@ -17,6 +17,18 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/spot-submit/spot-submit",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/my-submissions/my-submissions",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/favorites/favorites",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/shop/shop",
       "style": { "navigationStyle": "custom" }
     },

@@ -68,6 +68,76 @@ function netError(msg) {
   return e
 }
 
+/**
+ * 解析可展示的图片地址：后端返回的 /static/uploads/... 为相对路径，
+ * 这里补上服务端源站（BASE_URL 去掉 /api），外链 / 本地临时路径原样返回。
+ * @param {string} path 图片地址
+ * @returns {string} 可直接用于 image src / previewImage 的地址
+ */
+export function mediaUrl(path) {
+  const s = String(path || '')
+  if (!s) return ''
+  if (/^(https?:)?\/\//i.test(s) || s.indexOf('data:') === 0) return s
+  if (s.indexOf('wxfile:') === 0 || s.indexOf('file:') === 0 || s.indexOf('blob:') === 0) return s
+  const origin = BASE_URL.replace(/\/api\/?$/, '')
+  return origin + (s.charAt(0) === '/' ? s : '/' + s)
+}
+
+/**
+ * 上传文件（multipart），与 request 共用 BASE_URL / token / 统一响应解包。
+ * @param {{url: string, filePath: string, name?: string, formData?: Object, auth?: boolean, timeout?: number, onProgress?: Function}} opts
+ *   url 为相对 BASE_URL 的路径（如 '/uploads/spot'）；onProgress(percent) 接收 0~100 进度
+ * @returns {Promise<*>} 解包后的 body.data
+ * @throws {Error} 业务错误（business=true，含 code/data）或网络错误（business=false）
+ */
+export function upload(opts) {
+  const { url, filePath, name = 'file', formData = {}, auth = true, timeout = 60000, onProgress } = opts || {}
+  return new Promise((resolve, reject) => {
+    const header = {}
+    const token = getToken()
+    if (auth && token) header.Authorization = 'Bearer ' + token
+
+    const task = uni.uploadFile({
+      url: BASE_URL + url,
+      filePath,
+      name,
+      formData,
+      header,
+      timeout,
+      success: res => {
+        let body = res.data
+        if (typeof body === 'string') {
+          try { body = JSON.parse(body) } catch (e) { body = null }
+        }
+        if (res.statusCode === 401) {
+          setToken('')
+          Store.logout()
+          toLogin()
+          reject(apiError(401, (body && body.msg) || '登录已过期，请重新登录', body && body.data))
+          return
+        }
+        if (body && typeof body.code !== 'undefined' && body.code !== 0) {
+          reject(apiError(body.code, body.msg, body.data))
+          return
+        }
+        if (res.statusCode >= 400) {
+          reject(netError((body && body.msg) || ('服务异常（' + res.statusCode + '）')))
+          return
+        }
+        if (!body || typeof body.code === 'undefined') {
+          reject(netError('响应格式不正确'))
+          return
+        }
+        resolve(body.data)
+      },
+      fail: err => reject(netError(err && err.errMsg))
+    })
+    if (task && typeof task.onProgressUpdate === 'function' && typeof onProgress === 'function') {
+      task.onProgressUpdate(res => onProgress(res.progress))
+    }
+  })
+}
+
 /** 发起请求；成功 resolve(data)，失败 reject(Error)
  *  timeout：默认 12s；个别接口首屏要等大模型生成（如 /spots），调用方需自行调大。
  * @param {{url: string, method?: string, data?: *, auth?: boolean, timeout?: number}} opts
@@ -120,4 +190,4 @@ export function request(opts) {
   })
 }
 
-export default { request, getToken, setToken, BASE_URL }
+export default { request, upload, mediaUrl, getToken, setToken, BASE_URL }
