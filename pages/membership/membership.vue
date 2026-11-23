@@ -16,7 +16,7 @@
                 <text style="font-size: 17px; font-weight: 700; color: #fff">渔获 AI 会员</text>
                 <text class="tag tag--glass">{{ isMember ? '已开通' : (plan.tag || '推荐') }}</text>
               </view>
-              <text class="tiny mt4 mb-head-sub">{{ isMember ? '有效期至 ' + memberExpire + '，续费可叠加时长' : '无限次查天气与野塘 · 全程无广告 · 会员签到积分更高' }}</text>
+              <text class="tiny mt4 mb-head-sub">{{ isMember ? '有效期至 ' + memberExpire + '，续费可叠加时长' : '无限次查天气与钓点 · 全程无广告 · 会员签到积分更高' }}</text>
             </view>
             <view style="text-align: right; flex: none">
               <text class="mb-head-price">¥{{ money(plan.price) }}</text>
@@ -154,8 +154,8 @@ export default {
       // 常见问题：[问题, 答案] 二元组，点击后弹窗展示
       faq: [
         ['如何取消自动续费？', '会员为按月自动续费，可在微信「我 → 服务 → 钱包 → 支付设置 → 自动续费」中随时关闭；关闭后当前周期结束前权益不受影响。'],
-        ['会员是否全平台通用？', '同一账号在渔获 AI 小程序内全部功能通用：钓鱼天气、附近野塘、每日签到与观看广告额度同步生效。'],
-        ['会员与非会员有什么区别？', '非会员无法查看钓鱼天气与附近野塘；开通会员后可无限次使用全部功能、全程无广告，签到与广告积分也更高。']
+        ['会员是否全平台通用？', '同一账号在渔获 AI 小程序内全部功能通用：钓鱼天气、附近钓点、每日签到与观看广告额度同步生效。'],
+        ['会员与非会员有什么区别？', '非会员无法查看钓鱼天气与附近钓点；开通会员后可无限次使用全部功能、全程无广告，签到与广告积分也更高。']
       ]
     }
   },
@@ -184,7 +184,7 @@ export default {
     rows() {
       return [
         ['查钓鱼天气', '需开通会员', '无限次'],
-        ['附近野塘', '需开通会员', '无限次'],
+        ['附近钓点', '需开通会员', '无限次'],
         ['广告', '会展示', '全程无广告'],
         ['每日签到', '非会员 +' + this.normalPts + ' 分', '会员 +' + this.memberPts + ' 分'],
         ['每日看广告额度', this.normalLimit + ' 条', this.memberLimit + ' 条']
@@ -316,7 +316,7 @@ export default {
         sub: '有效期至 ' + expire + '，随时可取消自动续费',
         benefits: [
           { ic: 'cloud', t: '无限次查钓鱼天气', d: '非会员需开通会员后才能查看' },
-          { ic: 'map-pin', t: '无限次查附近野塘', d: '由近到远实景与钓友真实评价' },
+          { ic: 'map-pin', t: '无限次查附近钓点', d: '由近到远实景与钓友真实评价' },
           { ic: 'shield-check', t: '全程无广告', d: '查询与签到不再插播广告' },
           { ic: 'calendar-check', t: '签到积分按会员标准发放', d: '每次签到 +' + this.memberPts + ' 分' },
           { ic: 'play-circle', t: '每日广告额度 ' + this.memberLimit + ' 条', d: '观看广告赚积分更高效' }

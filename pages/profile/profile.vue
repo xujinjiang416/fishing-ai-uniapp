@@ -75,7 +75,7 @@
                   <text>收藏钓点</text>
                 </view>
                 <text class="stat__val">{{ favorites }}<text class="stat-unit"> 个</text></text>
-                <text class="stat__hint">附近的野塘</text>
+                <text class="stat__hint">附近的钓点</text>
               </view>
             </view>
           </view>
@@ -149,7 +149,7 @@
             <view class="section__head">
               <view class="section__title"><text>我的评论</text></view>
               <view class="section__more" @click="go('/pages/spots/spots')">
-                <text>去野塘</text>
+                <text>去钓点</text>
                 <AppIcon name="chevron-right" :size="13" color="#0A6A6C" />
               </view>
             </view>
@@ -188,7 +188,7 @@
             <view v-else class="empty">
               <view class="empty__ic"><AppIcon name="message-circle" :size="26" color="#9AA9A7" /></view>
               <text class="empty__t">还没有发表过评论</text>
-              <text class="tiny mt4" style="display: block">去野塘详情页分享你的鱼情</text>
+              <text class="tiny mt4" style="display: block">去钓点详情页分享你的鱼情</text>
             </view>
           </view>
 
@@ -400,7 +400,7 @@ export default {
         if (res.code !== 0 || !res.data) return
         const ids = res.data.ids || []
         this.favoriteCount = ids.length
-        // 同步本地收藏集合，保证野塘详情页「已收藏」状态正确
+        // 同步本地收藏集合，保证钓点详情页「已收藏」状态正确
         const cur = Store.data.favorites
         cur.splice(0, cur.length, ...ids)
         Store.save()
@@ -477,7 +477,7 @@ export default {
         title: '关于渔获 AI',
         sub: 'AI 钓鱼助手 · 原型演示版 v1.0.0',
         notes: [
-          { type: 'info', icon: 'info', text: '本原型中的天气、鱼情、野塘与商品数据均为大模型与气象源联合生成的演示数据，仅供出钓参考。' },
+          { type: 'info', icon: 'info', text: '本原型中的天气、鱼情、钓点与商品数据均为大模型与气象源联合生成的演示数据，仅供出钓参考。' },
           { type: 'gold', icon: 'shield-check', text: '账号与积分数据来自后端服务，演示环境不会产生真实交易与扣款。' }
         ],
         buttons: [{ text: '知道了', cls: 'line', value: true }]
@@ -492,7 +492,7 @@ export default {
     async logout() {
       const yes = await ui.confirm({
         title: '退出登录？',
-        text: '退出后需重新登录才能查看天气、野塘等功能。',
+        text: '退出后需重新登录才能查看天气、钓点等功能。',
         okText: '退出登录',
         cancelText: '再想想'
       })

@@ -181,7 +181,7 @@ export default {
     upHint() {
       return this.left <= 0
         ? '今日 ' + this.normalLimit + ' 条额度已用完，开通会员可提升至每日 ' + this.memberLimit + ' 条'
-        : '会员每日可看 ' + this.memberLimit + ' 条，还能无限次查天气与野塘'
+        : '会员每日可看 ' + this.memberLimit + ' 条，还能无限次查天气与钓点'
     }
   },
   onLoad() {

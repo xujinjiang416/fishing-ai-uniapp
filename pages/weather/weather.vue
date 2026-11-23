@@ -314,11 +314,11 @@
               </view>
             </view>
 
-            <!-- 区块：底部引导按钮 / 跳转附近野塘（同样需会员鉴权） -->
+            <!-- 区块：底部引导按钮 / 跳转附近钓点（同样需会员鉴权） -->
             <view class="mt16">
               <view class="btn btn--primary btn--block btn--lg" @click="goSpots">
                 <AppIcon name="map-pin" :size="18" color="#FFFFFF" />
-                <text>查看附近野塘</text>
+                <text>查看附近钓点</text>
               </view>
             </view>
           </view>
@@ -561,7 +561,7 @@ export default {
       this.nowIdx = 0
       Api.fetchWeather({
         place: l.province + ' ' + l.city + ' ' + l.district,
-        placeDetail: '3 公里范围内野塘',
+        placeDetail: '3 公里范围内钓点',
         date: this.days[this.dayIdx].date
       }).then(res => {
         if (res.code !== 0 || !res.data) { this.loading = false; return }
@@ -628,15 +628,15 @@ export default {
       ui.toast('原型演示：真实版将生成分享图并唤起微信分享', 'share')
     },
     /**
-     * 跳转附近野塘（需 spots 功能鉴权）
+     * 跳转附近钓点（需 spots 功能鉴权）
      * @returns {Promise<void>}
      */
     async goSpots() {
       const ok = await ui.requireUnlock({
         feature: 'spots',
-        title: '开通会员查看附近野塘',
-        sub: '开通会员即可无限次查看附近野塘，全程无广告',
-        featureLabel: '附近野塘查询'
+        title: '开通会员查看附近钓点',
+        sub: '开通会员即可无限次查看附近钓点，全程无广告',
+        featureLabel: '附近钓点查询'
       })
       if (ok) nav('/pages/spots/spots')
     }

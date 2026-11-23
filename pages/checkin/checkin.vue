@@ -198,7 +198,7 @@ export default {
     rules() {
       return [
         { ic: 'calendar-check', t: '每日签到', d: '会员每次 +' + this.memberPoints + ' 积分，非会员每次 +' + this.normalPoints + ' 积分，无需观看广告' },
-        { ic: 'crown', t: '开通会员', d: '会员可无限次查看天气与野塘，并享受更高的签到积分' }
+        { ic: 'crown', t: '开通会员', d: '会员可无限次查看天气与钓点，并享受更高的签到积分' }
       ]
     }
   },

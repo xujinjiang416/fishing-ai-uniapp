@@ -180,18 +180,6 @@ export function lvlTag(level) {
 }
 
 /**
- * 由近到远的距离分组标签
- * @param {number} km 距离（公里），需为已计算的数值
- * @returns {string} 分组文案（如 '3 公里内 · 家门口'）
- */
-export function distGroup(km) {
-  if (km <= 3) return '3 公里内 · 家门口'
-  if (km <= 6) return '3-6 公里 · 骑行可达'
-  if (km <= 10) return '6-10 公里 · 驾车一刻钟'
-  return '10 公里以上 · 值得一跑'
-}
-
-/**
  * 计算当前时刻落在第几个时段
  * @param {Array<{time: string}>} slots 时段数组，time 形如 '06:00-09:00'
  * @returns {number} 命中时段下标；未命中或空数组返回 -1

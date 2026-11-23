@@ -98,7 +98,7 @@
             </view>
             <view v-if="!isMember" class="row" style="gap: 4px; margin-top: 8px">
               <AppIcon name="lock" :size="12" color="rgba(255,255,255,.72)" />
-              <text class="tiny" style="color: rgba(255,255,255,.72)">开通会员后可无限次查看天气与野塘</text>
+              <text class="tiny" style="color: rgba(255,255,255,.72)">开通会员后可无限次查看天气与钓点</text>
             </view>
           </view>
 
@@ -192,7 +192,7 @@
                 </view>
                 <view class="grow">
                   <text style="font-weight: 700; display: block">会员权益生效中</text>
-                  <text class="tiny" style="opacity: .9; display: block">无限次查天气与野塘 · 全程免广告 · 签到免广告</text>
+                  <text class="tiny" style="opacity: .9; display: block">无限次查天气与钓点 · 全程免广告 · 签到免广告</text>
                 </view>
               </view>
             </view>
@@ -265,7 +265,7 @@
 <script>
 /* 首页 —— FishCast 主入口
  *
- * 职责：展示今日出钓指数概览、核心功能入口（天气 / 野塘）、积分签到、会员与工具区。
+ * 职责：展示今日出钓指数概览、核心功能入口（天气 / 钓点）、积分签到、会员与工具区。
  * props/emits：页面级组件，无 props、无 emits。
  * 数据来源：
  *   - Api.ensureConfig()：同步后台配置（签到 / 广告额度 / 会员套餐）；
@@ -324,16 +324,16 @@ export default {
         },
         {
           feature: 'spots', href: '/pages/spots/spots', icon: 'map-pin',
-          title: '附近野塘查询', badge: '实时更新', badgeCls: 'tag--primary',
-          desc: '由近到远的野塘实景 · 位置一键复制导航 · 钓友真实评价',
-          tags: ['实景图片', '评论可传图', '距离排序'],
-          lockTitle: '解锁「附近野塘查询」', d: 3
+          title: '附近钓点查询', badge: '实时更新', badgeCls: 'tag--primary',
+          desc: '真实水域的钓点实景 · 位置一键复制导航 · 钓友真实评价',
+          tags: ['实景图片', '评论可传图', '真实水域'],
+          lockTitle: '解锁「附近钓点查询」', d: 3
         }
       ],
       /* 出钓工具配置：ic = 图标键名，t = 名称，href = 目标页，lock = 需鉴权的功能键（null 表示免鉴权） */
       tools: [
         { ic: 'sunrise', t: '黄金时段', href: '/pages/weather/weather', lock: 'weather' },
-        { ic: 'map-pin', t: '附近野塘', href: '/pages/spots/spots', lock: 'spots' },
+        { ic: 'map-pin', t: '附近钓点', href: '/pages/spots/spots', lock: 'spots' },
         { ic: 'compass', t: '钓位朝向', href: '/pages/weather/weather', lock: 'weather' },
         { ic: 'clipboard-list', t: '出钓清单', href: '/pages/profile/profile', lock: null }
       ]
@@ -457,7 +457,7 @@ export default {
       this.loading = true
       Api.fetchWeather({
         place: l.province + ' ' + l.city + ' ' + l.district,
-        placeDetail: '3 公里范围内野塘'
+        placeDetail: '3 公里范围内钓点'
       }).then(res => {
         if (res.code !== 0 || !res.data) { this.loading = false; return }
         this.W = res.data.weather
@@ -504,7 +504,7 @@ export default {
         feature,
         title: title || '开通会员',
         sub: '开通会员后可无限次使用对应功能，且全程无广告',
-        featureLabel: feature === 'weather' ? '钓鱼天气查询' : '附近野塘查询'
+        featureLabel: feature === 'weather' ? '钓鱼天气查询' : '附近钓点查询'
       })
       if (ok) nav(href)
     },
@@ -515,7 +515,7 @@ export default {
      */
     onTool(x) {
       if (x.lock) {
-        this.goFeature(x.lock, x.href, x.lock === 'weather' ? '开通会员查看钓鱼天气' : '开通会员查看附近野塘')
+        this.goFeature(x.lock, x.href, x.lock === 'weather' ? '开通会员查看钓鱼天气' : '开通会员查看附近钓点')
       } else {
         nav(x.href)
       }

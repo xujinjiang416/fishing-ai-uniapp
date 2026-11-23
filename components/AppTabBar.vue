@@ -19,7 +19,7 @@
 /* AppTabBar —— 自定义底部导航（跨端一致，图标使用 AppIcon）
  * 用法：每个 tab 页在最外层放 <AppTabBar page="index" />
  *
- * 职责：4 个一级入口（首页 / 野塘 / 商城 / 我的）的固定底栏，负责高亮与跳转。
+ * 职责：4 个一级入口（首页 / 钓点 / 商城 / 我的）的固定底栏，负责高亮与跳转。
  * props：
  *   - page String 当前页面 key（index | weather | spots | spot-detail | shop |
  *                product-detail | profile | checkin | earn | membership），默认 'index'；
@@ -43,7 +43,7 @@ export default {
       /* Tab 配置表：key 用于高亮比对，label 为文案，icon 为 AppIcon 键名，url 为跳转路径 */
       items: [
         { key: 'home', label: '首页', icon: 'home', url: '/pages/index/index' },
-        { key: 'spots', label: '野塘', icon: 'map-pin', url: '/pages/spots/spots' },
+        { key: 'spots', label: '钓点', icon: 'map-pin', url: '/pages/spots/spots' },
         { key: 'shop', label: '商城', icon: 'shopping-bag', url: '/pages/shop/shop' },
         { key: 'profile', label: '我的', icon: 'user', url: '/pages/profile/profile' }
       ]

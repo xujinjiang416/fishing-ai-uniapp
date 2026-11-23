@@ -62,10 +62,6 @@
                   <Rating :value="S.rating" :size="13" />
                   <text style="font-weight: 700; color: var(--c-warn); font-size: 13px">{{ ratingText(S.rating) }}</text>
                   <text class="tiny">{{ S.commentCount }} 条评价</text>
-                  <view class="row" style="gap: 3px">
-                    <AppIcon name="navigation" :size="12" color="#9AA9A7" />
-                    <text class="tiny">{{ S.dist }} 公里 · {{ S.walk }}</text>
-                  </view>
                 </view>
               </view>
               <view class="chip heart-btn" :class="{ 'is-on': fav }" style="flex: none" @click="toggleFav">
@@ -114,7 +110,7 @@
                 <AppIcon name="map-pin" :size="18" color="#0A6A6C" />
                 <view class="grow">
                   <text style="font-weight: 600; line-height: 1.5; display: block">{{ S.address }}</text>
-                  <text class="tiny num mt4" style="display: block">坐标 {{ S.coord }}</text>
+                  <text v-if="S.coord" class="tiny num mt4" style="display: block">坐标 {{ S.coord }}</text>
                 </view>
               </view>
               <view class="row" style="gap: 8px">
@@ -164,7 +160,7 @@
             <view class="section__head">
               <view class="section__title"><text>相似钓点推荐</text></view>
               <view class="section__more" @click="go('/pages/spots/spots')">
-                <text>更多野塘</text>
+                <text>更多钓点</text>
                 <AppIcon name="chevron-right" :size="13" color="#6E807E" />
               </view>
             </view>
@@ -182,7 +178,6 @@
                     <text class="ellipsis" style="font-weight: 600; font-size: 13px; display: block">{{ s.name }}</text>
                     <view class="row mt4" style="gap: 6px">
                       <Rating :value="s.rating" :size="11" />
-                      <text class="tiny">{{ s.dist }} km</text>
                     </view>
                     <text class="tiny mt4 ellipsis" style="display: block">{{ s.fish.join(' · ') }}</text>
                   </view>
@@ -340,8 +335,8 @@ export default {
     return {
       loading: true, // 首屏骨架开关：请求返回后关闭
       spotId: 's1', // 钓点 ID，来自路由参数 ?id=，缺省 s1（演示数据）
-      S: { comments: [], fish: [], gallery: [] }, // 钓点详情：名称/评分/评论/距离/鱼种/图集/坐标/注意事项等
-      similar: [], // 相似钓点：排除自身后按距离升序取前 3 条
+      S: { comments: [], fish: [], gallery: [] }, // 钓点详情：名称/评分/评论/鱼种/图集/坐标/注意事项等
+      similar: [], // 相似钓点：排除自身后取前 3 条
       gi: 0, // 当前图集索引，0 表示首图
       likes: {}, // 评论点赞数缓存 { 评论id: 数量 }
       liked: {}, // 当前用户点赞态缓存 { 评论id: boolean }
@@ -423,6 +418,8 @@ export default {
     this.load()
   },
   methods: {
+    // 模板中使用的 utils 函数必须挂到 methods：小程序端非内联渲染无法直接访问模块内导入
+    ratingText,
     /**
      * 通用页面跳转
      * @param {string} url 目标页面路径（可带查询串）
@@ -442,9 +439,8 @@ export default {
       Promise.all([Api.fetchSpot(this.spotId), Api.fetchSpots({})]).then(res => {
         if (res[0].code !== 0 || !res[0].data) { this.loading = false; ui.toast(res[0].msg || '钓点加载失败', 'alert-triangle'); return }
         this.S = res[0].data
-        // 相似钓点：排除当前钓点后按距离升序取前 3 条
+        // 相似钓点：排除当前钓点后取前 3 条（不再按距离排序）
         const list = (res[1].data || []).filter(x => x.id !== this.S.id)
-        list.sort((a, b) => a.dist - b.dist)
         this.similar = list.slice(0, 3)
         this.loading = false
       })

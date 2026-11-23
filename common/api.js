@@ -167,7 +167,7 @@ const Api = {
     return call('/weather' + q(body), {})
   },
 
-  /* GET /api/spots?keyword&province&city&district -> [spots]（按位置生成，由近到远） */
+  /* GET /api/spots?keyword&province&city&district -> [spots]（按所选行政区返回真实小型水域） */
   /**
    * 查询附近钓点（省市区缺省取本地已选位置）
    * @param {{keyword?: string, province?: string, city?: string, district?: string}} [params]
@@ -176,13 +176,13 @@ const Api = {
   async fetchSpots(params) {
     const p = params || {}
     const loc = Store.location || {}
-    // 该地区首次查询要等大模型生成（实测 10~30s），超时时间单独放宽
+    // 该地区首次查询要等高德 + OSM 检索与大模型补文案（实测 30~90s），超时时间单独放宽
     return call('/spots' + q({
       keyword: p.keyword,
       province: p.province || loc.province,
       city: p.city || loc.city,
       district: p.district || loc.district
-    }), { auth: !!Store.isLoggedIn, timeout: 60000 })
+    }), { auth: !!Store.isLoggedIn, timeout: 90000 })
   },
 
   /* GET /api/spots/:id -> { spot } */
