@@ -58,11 +58,11 @@ function apiError(code, msg, data) {
 }
 
 /** 网络层错误（连不上后端、超时、响应格式异常），可降级到本地 mock
- * @param {string} [msg] 错误文案（缺省提示确认后端服务）
+ * @param {string} [msg] 错误文案（缺省为通用网络异常提示）
  * @returns {Error} 带 business=false / code=-1 的 Error 实例
  */
 function netError(msg) {
-  const e = new Error(msg || '网络异常，请确认后端服务已启动')
+  const e = new Error(msg || '网络异常，请稍后重试')
   e.code = -1
   e.business = false
   return e

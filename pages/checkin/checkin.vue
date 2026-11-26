@@ -29,7 +29,7 @@
           </view>
 
           <view class="row row--between mt12">
-            <text class="tiny white82">签到即得积分，无需看广告</text>
+            <text class="tiny white82">签到即得积分</text>
             <text v-if="isMember" class="tag tag--glass">会员 · 每日 +{{ basePoints }} 分</text>
             <text v-else class="tag tag--glass">积分可抵 ¥{{ money(usableYuan) }}</text>
           </view>
@@ -53,7 +53,8 @@
               :class="{ 'is-done': isDone(i), 'is-today': isToday(i) }"
             >
               <text class="day__n">周{{ d }}</text>
-              <view class="day__ic">
+              <text v-if="isPast(i)" class="day__status">{{ dayStatus(i) }}</text>
+              <view v-else class="day__ic">
                 <AppIcon :name="dayIcon(i)" :size="14" :color="dayIconColor(i)" />
               </view>
               <text class="day__p">+{{ basePoints }}</text>
@@ -78,14 +79,19 @@
           </view>
           <view class="notice notice--gold mt8">
             <AppIcon name="sparkles" :size="15" color="#8C6420" />
-            <text class="grow">会员每次签到 +{{ memberPoints }} 积分，非会员每次签到 +{{ normalPoints }} 积分，均无需观看广告。</text>
+            <text class="grow">会员每次签到 +{{ memberPoints }} 积分，非会员每次签到 +{{ normalPoints }} 积分。</text>
           </view>
         </view>
 
         <!-- 区块：本次签到结果 / 仅在 lastGain 有值时展示，提示本次获得积分与当前余额 -->
         <view v-if="lastGain" class="notice notice--info mt12">
           <AppIcon name="circle-check" :size="15" color="#0A6A6C" />
-          <text class="grow">本次签到获得 +{{ lastGain.points }} 积分，当前积分 {{ points }}。</text>
+          <text class="grow">本次签到获得 +{{ lastGain.points }} 积分{{ lastGain.bonus ? '（含周日双倍奖励）' : '' }}，当前积分 {{ points }}。</text>
+        </view>
+
+        <view v-if="weekBonusAvailable" class="notice notice--gold mt12">
+          <AppIcon name="gift" :size="15" color="#8C6420" />
+          <text class="grow">本周已连续签到 6 天，今天签到可获得双倍积分。</text>
         </view>
 
         <!-- 区块：签到操作 / 今日已签到展示置灰按钮，否则展示可点击的签到按钮
@@ -126,8 +132,7 @@
 
         <!-- 区块：页脚说明 / 说明积分汇率与单笔抵扣上限，数据随后台配置实时同步 -->
         <view class="mt24" style="text-align: center; padding-bottom: 8px">
-          <text class="tiny" style="display: block">{{ pointsPerYuan }} 积分 = 1 元 · 按 {{ pointsPerYuan }} 积分整数倍抵扣 · 单笔最多抵 10 元</text>
-          <text class="tiny mt4" style="color: var(--c-ink-4); display: block">积分规则由后台配置，实时同步</text>
+          <text class="tiny" style="display: block">{{ pointsPerYuan }} 积分 = 1 元 · 单笔最多抵 {{ maxYuan }} 元 · 积分充足可 0 元购</text>
         </view>
       </view>
     </view>
@@ -149,7 +154,7 @@
  * 业务限制：
  *   - 每日仅可签到一次，checkedToday 为 true 时按钮置灰
  *   - 连签天数 streak 用于日历展示，本周最多展示 7 天
- *   - 积分抵扣：pointsPerYuan 积分 = 1 元，需整数倍，单笔最多抵 10 元
+ *   - 积分抵扣：pointsPerYuan 积分 = 1 元，按整数积分抵扣，单笔最多抵 maxYuan，可足额抵至 0 元
  */
 import AppBar from '../../components/AppBar.vue'
 import AppIcon from '../../components/AppIcon.vue'
@@ -167,7 +172,13 @@ export default {
       // 本次签到结果：{ points, streak }，null 表示本次进入页面尚未签到
       lastGain: null,
       // 日历星期文案，默认周一至周日；后端返回 days 时以其为准
-      days: ['一', '二', '三', '四', '五', '六', '日']
+      days: ['一', '二', '三', '四', '五', '六', '日'],
+      // 今日下标（周一为 0）与本周每天的真实签到状态
+      todayIndex: (new Date().getDay() + 6) % 7,
+      weekChecked: Array(7).fill(false),
+      // 今日可领/已领积分与周日双倍资格，由签到状态接口下发
+      rewardPoints: null,
+      weekBonusAvailable: false
     }
   },
   computed: {
@@ -186,18 +197,22 @@ export default {
     normalPoints() { return Store.config.checkin.normalPoints },
     // 积分汇率：多少积分等于 1 元（后台配置）
     pointsPerYuan() { return Store.config.pointsPerYuan },
-    // 本周连签天数：日历与头部最多展示 7 天
+    // 本周连续签到天数：服务端按自然周计算，每周一归零
     weekStreak() { return Math.min(this.streak, 7) },
-    // 可抵扣金额（元）：按积分汇率向下取整，单笔最多抵 10 元
-    usableYuan() { return Math.min(10, Math.floor(this.points / this.pointsPerYuan)) },
-    // 本次签到可得积分：base 为基础分值，total 为按钮上展示的总积分
-    pot() { return { base: this.basePoints, total: this.basePoints } },
-    // 日历中已签到的格子数：受天数数组长度限制
-    doneCount() { return Math.min(this.streak, this.days.length) },
+    /** 单笔全局抵扣上限（元），来自后台配置 */
+    maxYuan() {
+      const cap = (Store.config.pointsRules && Store.config.pointsRules.globalCap) || 1500
+      return +(cap / this.pointsPerYuan).toFixed(2)
+    },
+    // 可抵扣金额（元）：按积分汇率换算，且不超过全局上限
+    usableYuan() { return Math.min(this.maxYuan, this.points / this.pointsPerYuan) },
+    // 本次签到可得积分：满足自然周条件时，周日为双倍积分
+    pot() { return { base: this.basePoints, total: this.rewardPoints === null ? this.basePoints : this.rewardPoints } },
     // 签到规则文案：分值全部来自后台配置，避免前端硬编码
     rules() {
       return [
-        { ic: 'calendar-check', t: '每日签到', d: '会员每次 +' + this.memberPoints + ' 积分，非会员每次 +' + this.normalPoints + ' 积分，无需观看广告' },
+        { ic: 'calendar-check', t: '每日签到', d: '会员每次 +' + this.memberPoints + ' 积分，非会员每次 +' + this.normalPoints + ' 积分' },
+        { ic: 'gift', t: '周日双倍奖励', d: '周一至周六连续签到，周日签到可获双倍积分；每周一重新计算' },
         { ic: 'crown', t: '开通会员', d: '会员可无限次查看天气与钓点，并享受更高的签到积分' }
       ]
     }
@@ -228,6 +243,10 @@ export default {
         Store.data.maxStreak = d.maxStreak
         Store.data.checkedToday = !!d.checkedToday
         if (d.days && d.days.length) this.days = d.days
+        this.todayIndex = d.todayIndex
+        this.weekChecked = d.weekChecked.map(Boolean)
+        this.rewardPoints = d.rewardPoints
+        this.weekBonusAvailable = !!d.weekBonusAvailable
         Store.save()
       })
     },
@@ -236,15 +255,30 @@ export default {
      * @param {number} i 天数下标（从 0 开始）
      * @returns {boolean}
      */
-    isDone(i) { return i < this.doneCount },
+    isDone(i) { return !!this.weekChecked[i] },
+    /**
+     * 判断第 i 天是否早于今天
+     * @param {number} i 天数下标（从 0 开始）
+     * @returns {boolean}
+     */
+    isPast(i) { return i < this.todayIndex },
+    /**
+     * 过去日期的签到文字：已签与漏签均明确标注
+     * @param {number} i 天数下标（从 0 开始）
+     * @returns {string}
+     */
+    dayStatus(i) {
+      if (!this.isPast(i)) return ''
+      return this.isDone(i) ? '已签到' : '未签到'
+    },
     /**
      * 判断第 i 天是否为「今日」高亮格
      * @param {number} i 天数下标（从 0 开始）
      * @returns {boolean}
-     * 说明：今日已签到时高亮最后一个已签格，否则高亮下一个待签格
+     * 说明：按实际星期高亮今天，与本周已连续签到多少天无关
      */
     isToday(i) {
-      return this.checkedToday ? i === this.doneCount - 1 : i === Math.min(this.doneCount, this.days.length - 1)
+      return i === this.todayIndex
     },
     /**
      * 日历格图标
@@ -277,13 +311,17 @@ export default {
       Api.doCheckin().then(res => {
         if (res.code !== 0) { ui.toast(res.msg || '签到失败，请重试', 'alert-triangle'); return }
         const d = res.data || {}
-        if (!d.points) { Store.data.checkedToday = true; Store.save(); this.lastGain = d; return }
-        Store.addPoints(d.points)
+        this.$set(this.weekChecked, this.todayIndex, true)
+        this.rewardPoints = d.points
+        this.weekBonusAvailable = false
         Store.data.streak = d.streak
         Store.data.checkedToday = true
+        if (!d.points) { Store.save(); this.lastGain = d; return }
+        Store.addPoints(d.points)
         Store.save()
         this.lastGain = d
-        ui.toast('签到成功 +' + d.points + ' 积分', 'circle-check')
+        Api.track('checkin', { points: d.points, streak: d.streak }, 'checkin')
+        ui.toast((d.bonus ? '周日双倍签到成功 +' : '签到成功 +') + d.points + ' 积分', 'circle-check')
       })
     }
   }
@@ -299,4 +337,6 @@ export default {
 .blance-num { display: block; font-family: var(--font-display); font-size: 27px; font-weight: 700; }
 .blance-yuan { font-weight: 700; color: var(--c-gold); }
 .btn--disabled { background: var(--c-line-soft); color: var(--c-ink-4); box-shadow: none; }
+.day__status { width: 100%; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 13px; background: var(--c-line-soft); color: var(--c-ink-3); font-size: 10px; font-weight: 600; }
+.day.is-done .day__status { background: var(--c-primary); color: #fff; }
 </style>

@@ -91,10 +91,6 @@
           </view>
         </view>
 
-        <!-- 区块：页脚说明 / 提示地址会保存到服务器，多端同步 -->
-        <view class="mt24" style="text-align: center; padding-bottom: 8px">
-          <text class="tiny" style="display: block">地址信息将保存到服务器，多端同步</text>
-        </view>
       </view>
     </view>
 

@@ -121,7 +121,11 @@ const Api = {
    * @returns {Promise<{code: number, data: *, msg?: string}>} data 含 { user }
    */
   async fetchProfile() {
-    return call('/user/profile', {})
+    const res = await call('/user/profile', {})
+    if (res.code === 0 && res.data && res.data.entitlements) {
+      Store.setEntitlements(res.data.entitlements)
+    }
+    return res
   },
 
   /* GET /api/cities -> [provinces]（省/市/区三级，选到区） */
@@ -188,9 +192,15 @@ const Api = {
       district: p.district || seg[2],
       lat: p.lat,
       lng: p.lng,
-      date: p.date
+      date: p.date,
+      // 非会员只请求摘要，避免服务端 403；会员请求全量
+      preview: p.preview === undefined ? (Store.weatherUnlocked ? 0 : 1) : (p.preview ? 1 : 0)
     }
-    return call('/weather' + q(body), {})
+    const res = await call('/weather' + q(body), {})
+    if (res.code === 0 && res.data && res.data.entitlements) {
+      Store.setEntitlements(res.data.entitlements)
+    }
+    return res
   },
 
   /* GET /api/spots?keyword&province&city&district -> [spots]（按所选行政区返回真实小型水域） */
@@ -438,6 +448,40 @@ const Api = {
     return call('/ads/creatives', { auth: false })
   },
 
+  /* POST /api/events body:{events:[{eventId,event,source,scene,channel,props}]} */
+  /**
+   * 批量上报行为事件（失败静默，不阻塞业务）
+   * @param {Array<Object>} events 事件数组
+   * @returns {Promise<{code: number, data: *, msg?: string}>}
+   */
+  async postEvents(events) {
+    if (!Array.isArray(events) || !events.length) return { code: 0, data: null }
+    return call('/events', { method: 'POST', data: { events: events.slice(0, 50) } })
+  },
+
+  /**
+   * 上报单条行为事件（失败静默，不阻塞页面）
+   * @param {string} event 事件名
+   * @param {Object} [props] 事件属性
+   * @param {string} [source] 来源模块
+   * @param {string} [scene] 场景
+   * @returns {void}
+   */
+  track(event, props, source, scene) {
+    if (!event) return
+    const eventId = 'ev_' + Date.now() + '_' + Math.random().toString(16).slice(2, 10)
+    this.postEvents([
+      {
+        eventId,
+        event,
+        source: source || 'miniapp',
+        scene: scene || '',
+        channel: 'miniapp',
+        props: props || {}
+      }
+    ])
+  },
+
   /* GET /api/checkin -> { checkedToday, streak, maxStreak, dailyPoints, days, date } */
   /**
    * 查询签到状态与本周签到日历
@@ -456,14 +500,16 @@ const Api = {
     return call('/checkin', { method: 'POST' })
   },
 
-  /* POST /api/ads/reward -> { points, todayCount, limit, pointsBalance } */
+  /* POST /api/ads/reward -> { points, todayCount, pointsBalance } */
   /**
-   * 看完广告后领取奖励积分（服务端计数并下发今日已看条数）
-   * @returns {Promise<{code: number, data: *, msg?: string}>} data 含 { points, todayCount, limit, pointsBalance }
+   * 看完广告后领取奖励积分（服务端仅统计观看次数，展示限制由微信流量主组件执行）
+   * @returns {Promise<{code: number, data: *, msg?: string}>} data 含 { points, todayCount, pointsBalance }
    */
-  async rewardAd() {
-    const res = await call('/ads/reward', { method: 'POST' })
-    // 服务端已计数，把本地额度与后端对齐
+  async rewardAd(requestId) {
+    // 客户端幂等号：同一视频只领一次；旧调用不传时服务端仍兼容
+    const rid = requestId || ('ad_' + Date.now() + '_' + Math.random().toString(16).slice(2, 10))
+    const res = await call('/ads/reward', { method: 'POST', data: { requestId: rid } })
+    // 服务端已计数，把本地观看统计与后端对齐
     if (res.code === 0 && res.data && res.data.todayCount != null) {
       Store.data.adsWatchedToday = res.data.todayCount
       Store.save()
@@ -477,7 +523,11 @@ const Api = {
    * @returns {Promise<{code: number, data: *, msg?: string}>} data 含 { isMember, memberExpire, plans }
    */
   async fetchMembership() {
-    return call('/user/membership', {})
+    const res = await call('/user/membership', {})
+    if (res.code === 0 && res.data && res.data.entitlements) {
+      Store.setEntitlements(res.data.entitlements)
+    }
+    return res
   },
 
   /* POST /api/user/membership body:{plan} -> { orderNo, months, payAmount, status, memberExpire } */
@@ -487,7 +537,11 @@ const Api = {
    * @returns {Promise<{code: number, data: *, msg?: string}>} data 含订单号、月数、金额、到期时间
    */
   async buyMembership(plan) {
-    return call('/user/membership', { method: 'POST', data: { plan: plan || '' } })
+    const res = await call('/user/membership', { method: 'POST', data: { plan: plan || '' } })
+    if (res.code === 0 && res.data && res.data.entitlements) {
+      Store.setEntitlements(res.data.entitlements)
+    }
+    return res
   },
 
   /* POST /api/user/favorites body:{spotId} -> { spotId, favorited } */

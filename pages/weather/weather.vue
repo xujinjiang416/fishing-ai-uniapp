@@ -323,11 +323,6 @@
             </view>
           </view>
 
-          <!-- 区块：页脚说明 / 免责声明与演示标识，底部留白避开 tabbar -->
-          <view class="mt16" style="text-align: center; padding-bottom: 8px">
-            <text class="tiny" style="display: block">数据由大模型与气象源联合生成，仅供出钓参考</text>
-            <text class="tiny mt4" style="color: var(--c-ink-4); display: block">渔获 AI · 原型演示，不产生真实交易与扣款</text>
-          </view>
         </template>
       </view>
     </view>
@@ -571,6 +566,7 @@ export default {
         // 只有「今天」才标出当前时段，未来日期不标
         this.nowIdx = this.dayIdx === 0 ? nowSlotIndex(this.SLOTS) : -1
         this.loading = false
+        Api.track('weather_query', { locked: !!res.data.locked, date: this.days[this.dayIdx].date }, 'weather')
       })
     },
     /**
@@ -618,14 +614,14 @@ export default {
      * @returns {void}
      */
     savePoster() {
-      ui.toast('原型演示：真实版将把海报保存到手机相册', 'download')
+      ui.toast('保存海报功能即将开放', 'download')
     },
     /**
      * 分享海报（原型阶段仅 toast 提示，真实版生成分享图并唤起微信）
      * @returns {void}
      */
     sharePoster() {
-      ui.toast('原型演示：真实版将生成分享图并唤起微信分享', 'share')
+      ui.toast('微信分享功能即将开放', 'share')
     },
     /**
      * 跳转附近钓点（需 spots 功能鉴权）

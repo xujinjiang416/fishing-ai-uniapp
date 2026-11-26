@@ -4,6 +4,16 @@
       <AppBar title="开通会员" back />
 
       <view class="page" style="padding-top: 4px">
+        <!-- 区块：投稿奖励到账通知 / 审核通过后由服务端返回，展示最近一条奖励 -->
+        <view v-if="rewards.length" class="notice notice--gold reward-notice">
+          <AppIcon name="gift" :size="18" color="#8C6420" />
+          <view class="grow">
+            <text class="reward-notice__title">钓点奖励已到账 · 1 天会员</text>
+            <text class="tiny reward-notice__text">你上报的「{{ rewards[0].spotName }}」已通过审核，会员有效期至 {{ rewards[0].memberExpire }}。</text>
+            <text class="tiny reward-notice__text">发放时间 {{ rewards[0].rewardedAt }}<text v-if="rewards.length > 1"> · 另有 {{ rewards.length - 1 }} 条奖励记录</text></text>
+          </view>
+        </view>
+
         <!-- 区块：会员头部 / 金色卡片展示会员身份、有效期或卖点，右侧为当前套餐价格
              布局逻辑：头像 + 文案区自适应 + 价格区固定宽度，标签行自动换行 -->
         <view class="card card--gold card--pad">
@@ -93,7 +103,7 @@
             <AppIcon name="crown" :size="18" color="#FFFFFF" />
             <text>{{ isMember ? '立即续费' : '立即开通' }} · ¥{{ money(plan.price) }}</text>
           </view>
-          <text class="tiny mt8 mb-terms">开通即代表同意《会员服务协议》· 原型演示不产生真实扣款</text>
+          <text class="tiny mt8 mb-terms">开通即代表同意《会员服务协议》</text>
         </view>
 
         <!-- 区块：常见问题 / 点击条目弹出问答弹窗，数据来自本地 faq 配置 -->
@@ -151,11 +161,13 @@ export default {
       selected: '',
       // 套餐列表，元素结构：{ id, name, price, duration, durationLabel, tag, benefits[] }
       plans: [],
+      // 投稿审核奖励到账记录，按发放时间倒序，最新一条用于通知展示
+      rewards: [],
       // 常见问题：[问题, 答案] 二元组，点击后弹窗展示
       faq: [
         ['如何取消自动续费？', '会员为按月自动续费，可在微信「我 → 服务 → 钱包 → 支付设置 → 自动续费」中随时关闭；关闭后当前周期结束前权益不受影响。'],
-        ['会员是否全平台通用？', '同一账号在渔获 AI 小程序内全部功能通用：钓鱼天气、附近钓点、每日签到与观看广告额度同步生效。'],
-        ['会员与非会员有什么区别？', '非会员无法查看钓鱼天气与附近钓点；开通会员后可无限次使用全部功能、全程无广告，签到与广告积分也更高。']
+        ['会员是否全平台通用？', '同一账号在渔获 AI 小程序内全部功能通用：钓鱼天气、附近钓点、每日签到与免广告权益同步生效。'],
+        ['会员与非会员有什么区别？', '非会员无法查看钓鱼天气与附近钓点；开通会员后可无限次使用全部功能、全程无广告，签到积分也更高。']
       ]
     }
   },
@@ -168,17 +180,13 @@ export default {
     plan() {
       return this.plans.filter(p => p.id === this.selected)[0] || this.plans[0] || { name: '会员', price: 0, durationLabel: '' }
     },
-    // 会员每日广告额度
-    memberLimit() { return Store.config.ad.limitMember },
-    // 普通用户每日广告额度
-    normalLimit() { return Store.config.ad.limitNormal },
     // 会员单次签到积分
     memberPts() { return Store.config.checkin.memberPoints },
     // 非会员单次签到积分
     normalPts() { return Store.config.checkin.normalPoints },
     // 头部卖点标签：数值部分取后台配置
     headTags() {
-      return ['无限次使用', '全程无广告', '签到 +' + this.memberPts + ' 分/天', '每日 ' + this.memberLimit + ' 条广告']
+      return ['无限次使用', '全程无广告', '签到 +' + this.memberPts + ' 分/天']
     },
     // 权益对比表：数据随后台配置动态生成
     rows() {
@@ -186,8 +194,7 @@ export default {
         ['查钓鱼天气', '需开通会员', '无限次'],
         ['附近钓点', '需开通会员', '无限次'],
         ['广告', '会展示', '全程无广告'],
-        ['每日签到', '非会员 +' + this.normalPts + ' 分', '会员 +' + this.memberPts + ' 分'],
-        ['每日看广告额度', this.normalLimit + ' 条', this.memberLimit + ' 条']
+        ['每日签到', '非会员 +' + this.normalPts + ' 分', '会员 +' + this.memberPts + ' 分']
       ]
     }
   },
@@ -195,7 +202,12 @@ export default {
     // 从解锁弹窗携带的套餐 id（planId）自动选中
     const pid = options && (options.planId || options.id)
     if (pid) this.selected = decodeURIComponent(pid)
+    Api.track('membership_view', { planId: this.selected || '' }, 'membership')
     this.load()
+  },
+  onShow() {
+    // 首次由 onLoad 加载；后续从投稿或审核结果页返回时刷新奖励通知
+    if (this.plans.length) this.load()
   },
   methods: {
     // 暴露金额格式化工具给模板使用
@@ -205,7 +217,10 @@ export default {
      * @param {string} id 套餐 id
      * @returns {void}
      */
-    pickPlan(id) { this.selected = id },
+    pickPlan(id) {
+      this.selected = id
+      Api.track('plan_select', { planId: id }, 'membership')
+    },
     /**
      * 加载套餐与会员状态
      * @returns {Promise<void>}
@@ -223,8 +238,10 @@ export default {
       const res = await Api.fetchMembership()
       if (res.code === 0 && res.data) {
         const d = res.data
-        Store.setMember(d.isMember)
+        if (d.entitlements) Store.setEntitlements(d.entitlements)
+        else Store.setMember(d.isMember)
         if (d.memberExpire) Store.data.memberExpire = d.memberExpire
+        this.rewards = Array.isArray(d.rewards) ? d.rewards : []
         Store.save()
         if (d.plans && d.plans.length) {
           this.plans = d.plans
@@ -276,7 +293,7 @@ export default {
       const renew = this.isMember
       const yes = await ui.confirm({
         title: renew ? '确认续费会员？' : '确认开通会员？',
-        text: (renew ? '续费' : '开通') + p.name + ' ¥' + money(p.price) + '\n原型演示，不会产生真实扣款',
+        text: (renew ? '续费' : '开通') + p.name + ' ¥' + money(p.price),
         okText: '确认支付 ¥' + money(p.price),
         cancelText: '再想想'
       })
@@ -299,6 +316,7 @@ export default {
         Store.setMember(true)
         Store.data.memberExpire = expire
         Store.save()
+        Api.track('purchase_success', { planId: p.id, amount: p.price }, 'membership')
         this.successModal(expire)
       })
     },
@@ -318,8 +336,7 @@ export default {
           { ic: 'cloud', t: '无限次查钓鱼天气', d: '非会员需开通会员后才能查看' },
           { ic: 'map-pin', t: '无限次查附近钓点', d: '由近到远实景与钓友真实评价' },
           { ic: 'shield-check', t: '全程无广告', d: '查询与签到不再插播广告' },
-          { ic: 'calendar-check', t: '签到积分按会员标准发放', d: '每次签到 +' + this.memberPts + ' 分' },
-          { ic: 'play-circle', t: '每日广告额度 ' + this.memberLimit + ' 条', d: '观看广告赚积分更高效' }
+          { ic: 'calendar-check', t: '签到积分按会员标准发放', d: '每次签到 +' + this.memberPts + ' 分' }
         ],
         buttons: [
           { text: '返回我的', cls: 'gold', value: 'profile' },
@@ -339,6 +356,9 @@ export default {
 </script>
 
 <style>
+.reward-notice { margin-bottom: 12px; align-items: flex-start; }
+.reward-notice__title { display: block; font-size: 14px; font-weight: 700; color: #8C6420; }
+.reward-notice__text { display: block; margin-top: 4px; line-height: 1.5; color: #8C6420; }
 /* 金色头部内的元素：半透明底与白色文字，保证在渐变背景上的对比度 */
 .avatar--crown { background: rgba(255, 255, 255, .22); color: #fff; }
 .tag--glass { background: rgba(255, 255, 255, .22); color: #fff; }

@@ -33,7 +33,12 @@ function defaultConfig() {
   return {
     pointsPerYuan: 150,
     checkin: { memberPoints: 5, normalPoints: 1 },
-    ad: { points: 5, seconds: 30, limitNormal: 15, limitMember: 20 },
+    ad: { points: 5 },
+    pointsRules: {
+      globalCap: 1500,
+      monthlyCapNormal: 2000,
+      monthlyCapMember: 2000
+    },
     plans: []
   }
 }
@@ -54,12 +59,21 @@ function defaults() {
     memberExpire: '',
     points: 0,                  // 当前可用积分（真实值以后端为准）
     pointsTotal: 0,
+    entitlements: {             // 服务端下发的权益矩阵（唯一口径）
+      member: false,
+      weather: false,
+      spots: false,
+      adFree: false,
+      support: 'normal',
+      checkinPoints: 1,
+      pointsMonthlyCap: 2000
+    },
     streak: 0,                  // 连续签到天数
     maxStreak: 0,
     lastCheckinDate: '',
     checkedToday: false,
     adsDate: today(),           // 广告计数所属日期，跨天时由 rollDaily 归零
-    adsWatchedToday: 0,         // 当天已看广告条数（受 adsLimit 上限约束）
+    adsWatchedToday: 0,         // 当天已看广告条数（仅统计，不设系统上限）
     adPointsToday: 0,           // 当天通过广告累计获得的积分
     location: { province: '', city: '', district: '' }, // 当前选点（省/市/区）
     favorites: [],              // 收藏的钓点 id 列表
@@ -176,6 +190,7 @@ const Store = {
       pointsPerYuan: cfg.pointsPerYuan || def.pointsPerYuan,
       checkin: Object.assign({}, def.checkin, cfg.checkin || {}),
       ad: Object.assign({}, def.ad, cfg.ad || {}),
+      pointsRules: Object.assign({}, def.pointsRules, cfg.pointsRules || {}),
       // 套餐必须是数组：旧结构缓存（无 plans 字段）时回退空数组，避免弹窗空白；
       // 后端明确返回空数组（全部下架）时尊重空值。
       plans: Array.isArray(cfg.plans) ? cfg.plans : def.plans
@@ -208,21 +223,10 @@ const Store = {
    * @returns {Array<Object>} 套餐数组，可能为空（表示后台未配置）
    */
   get plans() { return this.config.plans },
-  /** 当前身份对应的广告每日额度
-   * @returns {number} 会员取 limitMember，普通用户取 limitNormal
-   */
-  get adsLimit() {
-    const ad = this.config.ad
-    return this.isMember ? (ad.limitMember || 20) : (ad.limitNormal || 15)
-  },
   /** 单次广告可得积分
    * @returns {number} 配置值，缺省 5
    */
   get adPoints() { return this.config.ad.points || 5 },
-  /** 单次广告时长（秒）
-   * @returns {number} 配置值，缺省 30
-   */
-  get adSeconds() { return this.config.ad.seconds || 30 },
   /** 当前身份对应的签到积分
    * @returns {number} 会员取 memberPoints，普通用户取 normalPoints
    */
@@ -261,6 +265,10 @@ const Store = {
     if (u.phoneBound !== undefined) d.phoneBound = !!u.phoneBound
     if (u.isMember !== undefined) d.isMember = !!u.isMember
     if (u.memberExpire !== undefined) d.memberExpire = u.memberExpire || ''
+    if (u.entitlements && typeof u.entitlements === 'object') {
+      d.entitlements = Object.assign({}, d.entitlements, u.entitlements)
+      d.isMember = !!u.entitlements.member
+    }
     if (u.points != null) d.points = u.points
     if (u.pointsTotal != null) d.pointsTotal = u.pointsTotal
     if (u.streak != null) d.streak = u.streak
@@ -288,21 +296,52 @@ const Store = {
   logout() { load(); state.data.loggedIn = false; save() },
 
   /* ---- 会员 ---- */
-  /** 是否会员（内容访问权 / 广告额度 / 签到积分都依赖它） */
+  /** 是否会员（内容访问权 / 签到积分都依赖它） */
   get isMember() { load(); return !!state.data.isMember },
+  /** 服务端下发的权益矩阵（唯一口径；缺省时按非会员兜底） */
+  get entitlements() { load(); return state.data.entitlements || {} },
+  /** 是否免广告（会员权益；未同步时按会员身份兜底） */
+  get adFree() {
+    const e = this.entitlements
+    return e.adFree !== undefined ? !!e.adFree : this.isMember
+  },
+  /** 是否可看完整天气（会员权益；未同步时按会员身份兜底） */
+  get weatherUnlocked() {
+    const e = this.entitlements
+    return e.weather !== undefined ? !!e.weather : this.isMember
+  },
+  /** 是否可看完整钓点（会员权益；未同步时按会员身份兜底） */
+  get spotsUnlocked() {
+    const e = this.entitlements
+    return e.spots !== undefined ? !!e.spots : this.isMember
+  },
   /**
    * 设置会员状态（支付成功回调 / 拉取资料时同步）
    * @param {boolean} v 是否会员
    * @returns {void}
    */
   setMember(v) { load(); state.data.isMember = !!v; save() },
+  /** 写入服务端权益矩阵（登录 / 拉取资料 / 会员页返回时调用） */
+  setEntitlements(v) {
+    if (!v || typeof v !== 'object') return
+    load()
+    state.data.entitlements = Object.assign({}, state.data.entitlements, v)
+    state.data.isMember = !!state.data.entitlements.member
+    save()
+  },
 
   /* ---- 内容访问权（会员制）---- */
   /**
    * 当前身份是否可访问付费内容
-   * @returns {boolean} 等价于 isMember
+   * @param {string} [feature] weather / spots；缺省按会员身份判断
+   * @returns {boolean}
    */
-  isUnlocked() { return this.isMember },
+  isUnlocked(feature) {
+    const e = this.entitlements
+    if (feature === 'weather') return e.weather !== undefined ? !!e.weather : this.isMember
+    if (feature === 'spots') return e.spots !== undefined ? !!e.spots : this.isMember
+    return this.isMember
+  },
 
   /* ---- 积分 ---- */
   /** 当前可用积分 */
@@ -320,11 +359,9 @@ const Store = {
    */
   spendPoints(n) { load(); state.data.points = Math.max(0, state.data.points - n); save(); return state.data.points },
 
-  /* ---- 广告额度：普通 / 会员分别按配置读取 ---- */
+  /* ---- 广告统计：展示次数与时长由微信流量主规范控制 ---- */
   /** 当天已观看广告条数 */
   get adsWatchedToday() { load(); return state.data.adsWatchedToday },
-  /** 当天剩余可看广告次数（不小于 0） */
-  get adsLeftToday() { return Math.max(0, this.adsLimit - this.adsWatchedToday) },
   /**
    * 本地累加一次广告观看（服务端返回后应以接口计数为准覆盖）
    * @returns {number} 累加后的当天观看条数

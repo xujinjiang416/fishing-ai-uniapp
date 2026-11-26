@@ -4,6 +4,19 @@
       <AppBar title="上报钓点" back />
 
       <view class="page" style="padding-top: 4px">
+        <!-- 区块：审核奖励提示 / 告知通过审核后自动发放 1 天会员 -->
+        <view class="card card--gold card--pad submit-reward">
+          <view class="row" style="gap: 12px; align-items: flex-start">
+            <view class="avatar" style="background: rgba(255,255,255,.22)">
+              <AppIcon name="gift" :size="22" color="#FFFFFF" />
+            </view>
+            <view class="grow">
+              <text class="submit-reward__title">上报钓点，通过审核立得 1 天会员</text>
+              <text class="tiny submit-reward__text">填写准确位置并上传现场照片更容易通过。奖励自动到账，可在会员中心查看通知。</text>
+            </view>
+          </view>
+        </view>
+
         <!-- 区块：投稿表单 / 名称、水域、收费、鱼种、说明、位置与现场照片 -->
         <view class="card card--pad">
           <!-- 名称：可留空，由审核人员补充 -->
@@ -712,6 +725,7 @@ export default {
         ui.toast(res.msg || '提交失败，请稍后重试', 'alert-triangle')
         return
       }
+      Api.track('spot_submit', { region: this.region }, 'spot')
       ui.toast('投稿已提交，等待审核', 'circle-check')
       setTimeout(() => {
         uni.redirectTo({ url: '/pages/my-submissions/my-submissions' })
@@ -722,6 +736,9 @@ export default {
 </script>
 
 <style>
+.submit-reward { margin-bottom: 12px; }
+.submit-reward__title { display: block; color: #fff; font-size: 16px; font-weight: 700; }
+.submit-reward__text { display: block; margin-top: 5px; color: rgba(255,255,255,.88); line-height: 1.55; }
 /* 表单项：与地址编辑页保持同一视觉 */
 .form-item { padding: 12px 0; }
 .form-item + .form-item { border-top: 1px solid var(--c-line-soft); }

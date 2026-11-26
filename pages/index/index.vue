@@ -176,9 +176,9 @@
                 </view>
                 <view class="grow">
                   <text class="item__title" style="display: block">看广告赚积分</text>
-                  <text class="muted mt4" style="display: block">每条广告 +{{ adPoints }} 积分 · {{ isMember ? '会员每日可看 ' + memberLimit + ' 条' : '每日最多 ' + normalLimit + ' 条' }}</text>
+                  <text class="muted mt4" style="display: block">每条广告 +{{ adPoints }} 积分 · 积分永久有效</text>
                 </view>
-                <text class="tag tag--accent">+{{ Store.adsLeftToday * adPoints }} 分待领</text>
+                <text class="tag tag--accent">+{{ adPoints }} 分/条</text>
               </view>
             </view>
           </view>
@@ -192,7 +192,7 @@
                 </view>
                 <view class="grow">
                   <text style="font-weight: 700; display: block">会员权益生效中</text>
-                  <text class="tiny" style="opacity: .9; display: block">无限次查天气与钓点 · 全程免广告 · 签到免广告</text>
+                  <text class="tiny" style="opacity: .9; display: block">无限次查天气与钓点 · 全程免广告</text>
                 </view>
               </view>
             </view>
@@ -203,7 +203,7 @@
                     <text style="font-weight: 700; font-size: 15px">{{ memberTitle }}</text>
                     <text v-if="memberPlan && memberPlan.tag" class="tag" style="background: rgba(255,255,255,.24); color: #fff">{{ memberPlan.tag }}</text>
                   </view>
-                  <text class="tiny mt4" style="opacity: .92; display: block">无限次使用 · 无任何广告 · 会员签到 +{{ checkinPoints }} 分/天 · 广告额度 {{ memberLimit }} 条/日</text>
+                  <text class="tiny mt4" style="opacity: .92; display: block">无限次使用 · 无任何广告 · 会员签到 +{{ checkinPoints }} 分/天</text>
                 </view>
                 <view class="btn btn--sm" style="background: #fff; color: var(--c-gold)" @click="go('/pages/membership/membership')">
                   <text>立即开通</text>
@@ -235,7 +235,7 @@
           </view>
 
           <!-- 区块：广告位 / 仅非会员展示，点击进入「赚积分」页领取广告任务 -->
-          <view v-if="!isMember" class="section">
+          <view v-if="!adFree" class="section">
             <view class="card card--pad reveal ad-slot" style="--d: 8" @click="go('/pages/earn/earn')">
               <view class="row" style="gap: 10px">
                 <text class="tag tag--mute">广告</text>
@@ -248,11 +248,6 @@
             </view>
           </view>
 
-          <!-- 区块：页脚说明 / 免责声明与演示标识，底部额外留白避开 tabbar -->
-          <view class="mt24" style="text-align: center; padding-bottom: 8px">
-            <text class="tiny" style="display: block">渔获 AI · 数据由大模型与气象源联合生成，仅供出钓参考</text>
-            <text class="tiny mt4" style="color: var(--c-ink-4); display: block">原型演示 · 不产生真实交易与扣款</text>
-          </view>
         </view>
       </template>
     </view>
@@ -268,7 +263,7 @@
  * 职责：展示今日出钓指数概览、核心功能入口（天气 / 钓点）、积分签到、会员与工具区。
  * props/emits：页面级组件，无 props、无 emits。
  * 数据来源：
- *   - Api.ensureConfig()：同步后台配置（签到 / 广告额度 / 会员套餐）；
+ *   - Api.ensureConfig()：同步后台配置（签到 / 广告积分 / 会员套餐）；
  *   - Api.fetchWeather({ place, placeDetail })：W 天气、V 研判、SLOTS 时段轴；
  *   - Api.fetchAdCreatives()：首页广告位素材（取第一条）；
  *   - Store：位置、积分、签到、会员状态等本地状态。
@@ -342,6 +337,8 @@ export default {
   computed: {
     /** 是否会员：决定会员卡形态、广告位与锁定提示的显隐 */
     isMember() { return Store.isMember },
+    /** 是否免广告（服务端权益矩阵） */
+    adFree() { return Store.adFree },
     /**
      * 首页定位展示文案
      * @returns {String} 形如「杭州·西湖」，城市去掉「市」后缀
@@ -378,13 +375,9 @@ export default {
      * @returns {Number} 0~100
      */
     pointsPct() { return Math.min(100, Store.data.points / 20) },
-    // 广告积分 / 额度 / 套餐均以后台配置为准
+    // 广告积分 / 套餐均以后台配置为准，展示限制由微信流量主组件执行
     /** 单条广告奖励积分（后台配置） */
     adPoints() { return Store.adPoints },
-    /** 会员每日广告额度（后台配置） */
-    memberLimit() { return Store.config.ad.limitMember },
-    /** 非会员每日广告额度（后台配置） */
-    normalLimit() { return Store.config.ad.limitNormal },
     /** 当前身份下的签到积分（会员/非会员不同，由 Store 计算） */
     checkinPoints() { return Store.checkinPoints },
     /** 首个会员套餐（用于会员卡展示价格），无套餐时为 null */
@@ -403,7 +396,7 @@ export default {
     pointsPerYuan() { return Store.config.pointsPerYuan },
     /** 会员权益标签列表（由配置动态拼接） */
     memberTags() {
-      return ['无限次查询', '全程无广告', '签到 +' + this.checkinPoints + ' 分/天', '每日 ' + this.memberLimit + ' 条广告']
+      return ['无限次查询', '全程无广告', '签到 +' + this.checkinPoints + ' 分/天']
     },
     /**
      * 签到卡副文案
@@ -417,6 +410,7 @@ export default {
   },
   onLoad() {
     // 同步后台配置（签到 / 广告 / 套餐），保证首页展示与后台一致
+    Api.track('app_open', { member: Store.isMember }, 'app')
     Api.ensureConfig().then(() => {
       this.load()
       this.loadAd()
@@ -471,6 +465,7 @@ export default {
      * @returns {void}
      */
     loadAd() {
+      if (Store.adFree) { this.ad = { brand: '', slogan: '', cta: '' }; return }
       Api.fetchAdCreatives().then(res => {
         if (res.code === 0 && res.data && res.data.length) this.ad = res.data[0]
       })

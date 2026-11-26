@@ -88,7 +88,7 @@
                 <text class="tiny mt4" style="display: block">{{ g.sales }}</text>
                 <view v-if="maxDeduct > 0" class="goods__pts">
                   <AppIcon name="coins" :size="12" color="#C08A2E" />
-                  <text>最多可抵 ¥{{ maxDeduct }}</text>
+                  <text>最多可抵 ¥{{ money(maxDeduct) }}</text>
                 </view>
               </view>
             </view>
@@ -103,10 +103,10 @@
           <view class="notice notice--gold">
             <AppIcon name="percent" :size="16" color="#8C6420" />
             <view class="grow">
-              <text class="rule-line">· {{ pointsPerYuan }} 积分 = 1 元，仅支持 {{ pointsPerYuan }} 积分的整数倍抵扣；</text>
-              <text class="rule-line">· 单笔订单最多抵 10 元（即 {{ pointsPerYuan * 10 }} 积分）；</text>
-              <text class="rule-line">· 不足 {{ pointsPerYuan }} 整数倍的积分暂不可用。</text>
-              <text class="rule-line rule-ex">示例：商品 20 元 + {{ pointsPerYuan }} 积分 → 抵 1 元，实付 19 元。</text>
+              <text class="rule-line">· {{ pointsPerYuan }} 积分 = 1 元，按整数积分抵扣，不再限制积分倍数；</text>
+              <text class="rule-line">· 单笔订单最多抵 {{ maxYuan }} 元（即 {{ pointsPerYuan * maxYuan }} 积分），不限商品品类；</text>
+              <text class="rule-line">· 订单不足 {{ maxYuan }} 元且积分充足时，可足额抵扣至 0 元。</text>
+              <text class="rule-line rule-ex">示例：商品 20 元 + {{ pointsPerYuan * maxYuan }} 积分 → 抵 {{ maxYuan }} 元，实付 10 元。</text>
             </view>
           </view>
         </view>
@@ -122,8 +122,7 @@
             </view>
           </view>
           <view class="mt16" style="text-align: center; padding-bottom: 8px">
-            <text class="tiny" style="display: block">渔获 AI 商城 · {{ pointsPerYuan }} 积分 = 1 元，按 {{ pointsPerYuan }} 积分整数倍抵扣</text>
-            <text class="tiny mt4" style="color: var(--c-ink-4); display: block">原型演示 · 不产生真实交易</text>
+            <text class="tiny" style="display: block">渔获 AI 商城 · {{ pointsPerYuan }} 积分 = 1 元，单笔最多抵 {{ maxYuan }} 元</text>
           </view>
         </view>
       </view>
@@ -139,7 +138,7 @@
 /* 商城首页（底部 Tab 页，无路由参数）
  * 数据接口：Api.fetchGoods({ cat }) —— 按分类拉取商品；积分/汇率/会员态来自本地 Store（初值取自后端 /config）
  * 关键交互：分类切换、商品卡跳详情、会员开通入口、右上「积分明细」说明
- * 业务限制：pointsPerYuan 积分 = 1 元，仅整数倍抵扣，单笔订单最多抵 10 元
+ * 业务限制：pointsPerYuan 积分 = 1 元，按整数积分抵扣，单笔订单最多抵 maxYuan，足额抵扣可 0 元购
  */
 import AppBar from '../../components/AppBar.vue'
 import AppIcon from '../../components/AppIcon.vue'
@@ -177,10 +176,15 @@ export default {
      * @returns {number}
      */
     pointsPerYuan() { return Store.config.pointsPerYuan },
-    /** 每件商品最多可抵金额（元）：积分可兑金额与 10 元封顶取小
+    /** 单笔全局抵扣上限（元），来自后台配置 */
+    maxYuan() {
+      const cap = (Store.config.pointsRules && Store.config.pointsRules.globalCap) || 1500
+      return +(cap / this.pointsPerYuan).toFixed(2)
+    },
+    /** 每件商品最多可抵金额（元）：积分可兑金额与全局封顶取小
      * @returns {number}
      */
-    maxDeduct() { return Math.min(10, Math.floor(this.points / this.pointsPerYuan)) }
+    maxDeduct() { return Math.min(this.maxYuan, this.points / this.pointsPerYuan) }
   },
   onLoad() {
     this.loadGoods()
@@ -198,7 +202,7 @@ export default {
      */
     open(id) { nav('/pages/product-detail/product-detail?id=' + id) },
     /** 顶栏「积分明细」：原型阶段以 toast 说明兑换规则 */
-    onRight() { ui.toast('积分明细：' + this.pointsPerYuan + ' 积分 = 1 元，按 ' + this.pointsPerYuan + ' 积分整数倍抵扣') },
+    onRight() { ui.toast('积分明细：' + this.pointsPerYuan + ' 积分 = 1 元，单笔最多抵 ' + this.maxYuan + ' 元') },
     /**
      * 切换分类，分类未变化时不重复请求
      * @param {string} c 分类名

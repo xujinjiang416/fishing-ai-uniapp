@@ -102,7 +102,7 @@
                   :value="usePoints"
                   :min="0"
                   :max="sliderMax"
-                  :step="pointsPerYuan"
+                  :step="1"
                   :disabled="maxUsable <= 0"
                   activeColor="#C08A2E"
                   backgroundColor="#E7D3A6"
@@ -114,13 +114,13 @@
                 <view class="row mt12" style="gap: 8px; flex-wrap: wrap">
                   <view class="chip" @click="quick(1)"><text>抵 1 元</text></view>
                   <view class="chip" @click="quick(5)"><text>抵 5 元</text></view>
-                  <view class="chip" @click="quick('max')"><text>抵满 10 元</text></view>
+                  <view class="chip" @click="quick('max')"><text>按上限抵扣</text></view>
                 </view>
               </view>
 
               <view class="notice notice--info mt12">
                 <AppIcon name="info" :size="15" color="#0A6A6C" />
-                <text class="grow">不足 {{ pointsPerYuan }} 积分整数倍部分不可用；单笔最多抵 10 元；抵扣后实付最低 0.01 元。</text>
+                <text class="grow">{{ pointsPerYuan }} 积分 = 1 元；单笔最多抵 {{ maxYuan }} 元，不限商品品类；积分充足时可足额抵扣至 0 元。</text>
               </view>
             </view>
           </view>
@@ -202,7 +202,7 @@
  * 路由参数：id —— 商品 ID（缺省 'g1'）
  * 数据接口：Api.fetchGoodsDetail(id)、Api.fetchAddresses()、Api.createOrder({ goodsId, qty, usePoints, addressId })
  * 关键交互：数量加减、积分滑杆/快捷抵扣、选择收货地址、确认下单、拉起支付
- * 业务限制：数量 1 ~ 库存；积分按 pointsPerYuan 整数倍抵扣、单笔封顶 10 元、实付最低 0.01 元；下单必须有有效地址
+ * 业务限制：数量 1 ~ 库存；积分按整数抵扣、单笔封顶 10 元，积分充足可 0 元购；下单必须有有效地址
  */
 import AppBar from '../../components/AppBar.vue'
 import AppIcon from '../../components/AppIcon.vue'
@@ -219,7 +219,7 @@ export default {
       goodsId: 'g1', // 商品 ID，来自路由参数 ?id=，缺省 g1（演示数据）
       G: null, // 商品详情对象：price/orig/name/tags/sales/stock/spec/desc/img 等；null 时展示骨架
       qty: 1, // 购买数量，取值 1 ~ G.stock（库存上限）
-      usePoints: 0, // 本次抵扣使用的积分数，须为 pointsPerYuan 的整数倍
+      usePoints: 0, // 本次抵扣使用的整数积分，不再要求 150 的整数倍
       maxUsable: 0, // 当前可抵扣积分上限（可用积分/10 元封顶/商品金额三者取最小）
       addresses: [], // 收货地址列表
       selectedAddressId: 0, // 已选地址 ID，0 表示未选择
@@ -249,10 +249,10 @@ export default {
      * @returns {number}
      */
     deduct() { return this.usePoints / this.pointsPerYuan },
-    /** 实付金额：总价减抵扣，最低 0.01 元
+    /** 实付金额：总价减抵扣，积分充足时可降至 0 元
      * @returns {number}
      */
-    pay() { return Math.max(0.01, +(this.total - this.deduct).toFixed(2)) },
+    pay() { return Math.max(0, +(this.total - this.deduct).toFixed(2)) },
     /** 相对原价的立省金额，原价缺失或低于现价时为 0
      * @returns {number}
      */
@@ -260,7 +260,12 @@ export default {
     /** 滑杆最大值：至少保留一个步长，避免 slider 因 max=0 无法渲染
      * @returns {number}
      */
-    sliderMax() { return Math.max(this.maxUsable, this.pointsPerYuan) },
+    sliderMax() { return Math.max(this.maxUsable, 1) },
+    /** 单笔全局抵扣上限（元），来自后台配置 */
+    maxYuan() {
+      const cap = (Store.config.pointsRules && Store.config.pointsRules.globalCap) || 1500
+      return +(cap / this.pointsPerYuan).toFixed(2)
+    },
     /** 抵扣文案：显示已用积分与折算金额
      * @returns {string}
      */
@@ -337,18 +342,16 @@ export default {
         this.usePoints = this.maxUsable // 默认按最大可用积分抵扣
       })
     },
-    /* 抵扣上限：可用积分取整数倍 → 封顶 10 元 → 再受商品金额约束（保留 0.01） */
+    /* 抵扣上限：可用积分 / 全局 10 元上限 / 商品金额三重取最小 */
     calcMax() {
       const rate = this.pointsPerYuan
-      const total = this.G.price * this.qty
-      // 1) 可用积分向下取整到汇率整数倍（不足整数倍部分不可用）
-      const avail = Math.floor(Store.points / rate) * rate
-      const byCap = 10 * rate // 单笔最多抵 10 元
-      // 2) 商品金额上限：至少保留 0.01 元实付，再取整到汇率倍数
-      const byAmount = Math.floor(Math.max(0, total - 0.01)) * rate
-      // 3) 三者取最小得到最终上限
-      this.maxUsable = Math.max(0, Math.min(avail, byCap, byAmount))
-      // 4) 数量减少后，已选积分可能超限，回退到上限
+      const total = +(this.G.price * this.qty).toFixed(2)
+      const rules = Store.config.pointsRules || {}
+      const globalCap = Number(rules.globalCap || 1500)
+      // 按整数积分足额抵扣；金额换算四舍五入，避免 9.9 元等浮点误差
+      const byAmount = Math.round(total * rate)
+      this.maxUsable = Math.max(0, Math.min(Store.points, globalCap, byAmount))
+      // 数量减少后，已选积分可能超限，回退到上限
       if (this.usePoints > this.maxUsable) this.usePoints = this.maxUsable
     },
     /** 数量 +1，上限为库存（缺省 99），变动后重算抵扣上限 */
@@ -417,6 +420,7 @@ export default {
         const o = res.data
         // 服务端已扣减积分，本地同步该余额，不再伪造本地订单
         Store.spendPoints(o.usePoints || 0)
+        Api.track('order_create', { orderNo: o.orderNo, usePoints: o.usePoints || 0, goodsId: this.G.id }, 'shop')
         this.qty = 1
         this.usePoints = 0
         this.calcMax()

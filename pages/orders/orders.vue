@@ -100,10 +100,6 @@
           </view>
         </view>
 
-        <!-- 区块：页脚说明 / 居中提示 / 预留底部安全间距，避免被标签栏遮挡 -->
-        <view class="mt24" style="text-align: center; padding-bottom: 8px">
-          <text class="tiny" style="display: block">订单数据来自服务器 · 下拉可刷新列表</text>
-        </view>
       </view>
     </view>
 

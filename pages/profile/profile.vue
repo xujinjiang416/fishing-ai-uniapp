@@ -259,8 +259,7 @@
 
           <!-- 区块：页脚说明 / 版本信息与数据存储说明 -->
           <view class="mt24" style="text-align: center; padding-bottom: 8px">
-            <text class="tiny" style="display: block">渔获 AI · 原型演示版本</text>
-            <text class="tiny mt4" style="color: var(--c-ink-4); display: block">账号与积分数据由服务器保存</text>
+            <text class="tiny" style="display: block">渔获 AI</text>
           </view>
         </template>
       </view>
@@ -355,8 +354,13 @@ export default {
       const d = l.district || ''
       return c || d ? (c + (d ? ' · ' + d : '')) : '未设置'
     },
-    // 可抵扣金额（元）：向下取整，单笔最多抵 10 元
-    usableYuan() { return Math.min(10, Math.floor(this.points / this.pointsPerYuan)) }
+    /** 单笔全局抵扣上限（元），来自后台配置 */
+    maxYuan() {
+      const cap = (Store.config.pointsRules && Store.config.pointsRules.globalCap) || 1500
+      return +(cap / this.pointsPerYuan).toFixed(2)
+    },
+    // 可抵扣金额（元）：按积分汇率换算，且不超过全局上限
+    usableYuan() { return Math.min(this.maxYuan, this.points / this.pointsPerYuan) }
   },
   onLoad() {
     // 并行拉取用户资料与订单 / 评论 / 收藏，缩短首屏等待
@@ -452,7 +456,7 @@ export default {
     async resetData() {
       const yes = await ui.confirm({
         title: '清除本地缓存？',
-        text: '将清除本机保存的积分、会员、签到等缓存，随后会重新从服务器同步你的账号数据。',
+        text: '将清除本机保存的积分、会员、签到等缓存，并重新同步账号数据。',
         okText: '确认清除',
         cancelText: '再想想'
       })
@@ -476,11 +480,8 @@ export default {
     about() {
       ui.openModal({
         title: '关于渔获 AI',
-        sub: 'AI 钓鱼助手 · 原型演示版 v1.0.0',
-        notes: [
-          { type: 'info', icon: 'info', text: '本原型中的天气、鱼情、钓点与商品数据均为大模型与气象源联合生成的演示数据，仅供出钓参考。' },
-          { type: 'gold', icon: 'shield-check', text: '账号与积分数据来自后端服务，演示环境不会产生真实交易与扣款。' }
-        ],
+        sub: 'AI 钓鱼助手 · v1.0.0',
+        notes: [],
         buttons: [{ text: '知道了', cls: 'line', value: true }]
       })
     },

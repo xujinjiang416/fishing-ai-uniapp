@@ -76,9 +76,6 @@
           </view>
         </view>
 
-        <!-- 区块：底图与数据来源说明 / 满足地图版权署名 -->
-        <view class="map-meta">底图 © 高德地图 · 钓点数据 高德 / OpenStreetMap</view>
-
         <!-- 区块：加载态 / 首次查询较慢时给出文案安抚 -->
         <view v-if="loading" class="map-mask">
           <view class="map-mask__card">
@@ -775,19 +772,6 @@ export default {
 }
 
 /* 版权署名 */
-.map-meta {
-  position: absolute;
-  left: 10px;
-  bottom: 8px;
-  z-index: 4;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, .78);
-  color: var(--c-ink-3);
-  font-size: 10px;
-  line-height: 1.6;
-}
-
 /* 加载与空态遮罩 */
 .map-mask {
   position: absolute;

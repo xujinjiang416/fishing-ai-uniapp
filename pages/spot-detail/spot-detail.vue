@@ -23,6 +23,15 @@
           </view>
         </view>
 
+        <!-- 区块：会员位置锁定 / 非会员只展示基础信息，精确位置需开通会员 -->
+        <view v-if="spotsLocked" style="padding: 12px 16px 0">
+          <view class="notice notice--info">
+            <AppIcon name="lock" :size="15" color="#0A6A6C" />
+            <text class="grow">开通会员查看精确位置、完整图集与导航</text>
+            <text style="color: var(--c-primary); font-weight: 700" @click="unlockSpots">去开通</text>
+          </view>
+        </view>
+
         <!-- 区块：图集 / 顶部大图 + 底部缩略图横滑切换 / 无图时走占位块；返回按钮悬浮于图上层 -->
         <view class="hero-wrap">
           <view class="gallery-hero">
@@ -288,11 +297,6 @@
             </view>
           </view>
 
-          <!-- 区块：页脚说明 / 居中免责声明 / 预留底部安全间距，避免被标签栏遮挡 -->
-          <view class="mt24" style="text-align: center; padding-bottom: 8px">
-            <text class="tiny" style="display: block">渔获 AI · 钓点信息由钓友共建，仅供出钓参考</text>
-            <text class="tiny mt4" style="color: var(--c-ink-4); display: block">原型演示 · 不产生真实交易</text>
-          </view>
         </view>
       </template>
     </view>
@@ -514,6 +518,8 @@ export default {
      * @returns {boolean}
      */
     weatherLocked() { return !Store.isUnlocked('weather') },
+    /** 钓点位置是否被会员权益锁定 */
+    spotsLocked() { return this.S.locked || !Store.isUnlocked('spots') },
     /** 所有评论所带实景图的总数，用于「实景图 N 张」展示
      * @returns {number}
      */
@@ -569,6 +575,7 @@ export default {
       ]).then(res => {
         if (res[0].code !== 0 || !res[0].data) { this.loading = false; ui.toast(res[0].msg || '钓点加载失败', 'alert-triangle'); return }
         this.S = res[0].data
+        if (this.S.entitlements) Store.setEntitlements(this.S.entitlements)
         // 钓况反馈统计（yes/no 人数 + 当前用户投票）
         this.fishability = res[0].data.fishability || { yes: 0, no: 0, myVote: null, limit: 5 }
         // 详情接口已带评论，先以它为兜底；评论分页接口成功后覆盖第一页
@@ -579,6 +586,7 @@ export default {
         const list = (res[1].data || []).filter(x => x.id !== this.S.id)
         this.similar = list.slice(0, 3)
         this.loading = false
+        Api.track('spot_view', { spotId: this.spotId, locked: !!this.S.locked }, 'spot')
       })
     },
     /** 图片地址补全（本地 /static/uploads 相对路径 -> 服务端绝对地址） */
@@ -656,8 +664,20 @@ export default {
         ui.toast(on ? '已收藏该钓点' : '已取消收藏', 'heart')
       })
     },
+    /** 会员解锁钓点位置 */
+    async unlockSpots() {
+      const ok = await ui.requireUnlock({
+        feature: 'spots',
+        title: '开通会员查看钓点位置',
+        sub: '会员可查看精确坐标、完整图集与一键导航',
+        featureLabel: '钓点位置'
+      })
+      if (!ok) return
+      this.load()
+    },
     /** 复制「地址 + 坐标」，便于粘贴到第三方地图搜索 */
     copyLoc() {
+      if (this.spotsLocked) { this.unlockSpots(); return }
       ui.copy(this.S.address + ' ' + this.S.coord, '已复制，可粘贴到高德 / 百度 / 腾讯地图导航')
     },
     /** 解析 "lng,lat" 坐标串 */
@@ -672,6 +692,7 @@ export default {
     },
     /** 唤起系统地图导航 */
     doNav() {
+      if (this.spotsLocked) { this.unlockSpots(); return }
       const p = this.parseCoord(this.S.coord)
       if (!p) { ui.toast('该钓点暂无有效坐标，无法导航', 'alert-triangle'); return }
       uni.openLocation({
@@ -844,6 +865,7 @@ export default {
         this.S.coverFrom = 'comment'
         this.S.gallery = [c.images[0]]
       }
+      Api.track('review_submit', { spotId: this.S.id, rating: this.rating, images: c.images ? c.images.length : 0 }, 'spot')
       this.publishOpen = false
       this.text = ''
       this.picks = []
