@@ -39,6 +39,12 @@ function defaultConfig() {
       monthlyCapNormal: 2000,
       monthlyCapMember: 2000
     },
+    shop: {
+      supportsDesignatedExpress: false,
+      supportsSevenDayNoReasonReturn: false,
+      deliveryPolicy: '快递配送，由商家统一安排承运商',
+      afterSalePolicy: '不支持七天无理由退换货'
+    },
     plans: []
   }
 }
@@ -191,6 +197,7 @@ const Store = {
       checkin: Object.assign({}, def.checkin, cfg.checkin || {}),
       ad: Object.assign({}, def.ad, cfg.ad || {}),
       pointsRules: Object.assign({}, def.pointsRules, cfg.pointsRules || {}),
+      shop: Object.assign({}, def.shop, cfg.shop || {}),
       // 套餐必须是数组：旧结构缓存（无 plans 字段）时回退空数组，避免弹窗空白；
       // 后端明确返回空数组（全部下架）时尊重空值。
       plans: Array.isArray(cfg.plans) ? cfg.plans : def.plans

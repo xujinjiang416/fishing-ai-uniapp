@@ -642,7 +642,7 @@ input, textarea, button { font-family: inherit; }
 /* ---------- 24. Toast / 空状态 / 骨架 ---------- */
 .toast {
   position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + 44px);
-  transform: translateX(-50%); z-index: 99; max-width: 300px;
+  transform: translateX(-50%); z-index: 3000; max-width: 300px;
   display: flex; align-items: center; gap: 6px;
   padding: 10px 16px; border-radius: var(--r-pill);
   background: rgba(18,33,31,.9); color: #fff; font-size: 13px; line-height: 1.4;

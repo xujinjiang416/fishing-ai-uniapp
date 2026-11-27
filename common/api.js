@@ -421,6 +421,13 @@ const Api = {
     return call('/user/orders/' + encodeURIComponent(orderNo) + '/logistics', {})
   },
 
+  /* POST /api/user/orders/:orderNo/refund-request body:{reason,images} */
+  async applyRefund(orderNo, payload) {
+    return call('/user/orders/' + encodeURIComponent(orderNo) + '/refund-request', {
+      method: 'POST', data: payload
+    })
+  },
+
   /* GET /api/user/comments -> [comments] */
   /**
    * 获取我的评论列表

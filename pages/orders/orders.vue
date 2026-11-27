@@ -111,7 +111,7 @@
 /* 我的订单列表
  * 路由参数：无（支持下拉刷新，返回本页自动续刷）
  * 数据接口：Api.fetchOrders() -> 全量订单数组，前端按状态本地筛选
- * 状态口径：待付款 / 待发货 / 待收货 / 已完成 / 已取消（含退款售后）。
+ * 状态口径：正常订单从待发货开始，另含已发货 / 已完成及退款售后状态。
  * 商品评价功能已移除，页面不提供任何评价入口或待评价筛选。
  */
 import AppBar from '../../components/AppBar.vue'
@@ -125,11 +125,9 @@ import { nav } from '../../common/nav.js'
 /* 筛选映射：key 对应标签，value 为后端原始状态白名单；all 为 null 表示不过滤 */
 const FILTERS = {
   all: null,
-  unpaid: ['待支付'],
   unshipped: ['待发货'],
   shipped: ['已发货'],
-  cancelled: ['已关闭'],
-  refund: ['退款中', '部分退款', '已退款']
+  refund: ['退款中', '待退款审核', '部分退款', '已退款']
 }
 
 export default {
@@ -142,10 +140,8 @@ export default {
       tab: 'all', // 当前筛选 key，取值见 FILTERS，默认全部
       tabs: [ // 顶部筛选标签，count 徽标由 counts 计算
         { key: 'all', label: '全部' },
-        { key: 'unpaid', label: '待付款' },
         { key: 'unshipped', label: '待发货' },
         { key: 'shipped', label: '待收货' },
-        { key: 'cancelled', label: '已取消' },
         { key: 'refund', label: '退款/售后' }
       ]
     }

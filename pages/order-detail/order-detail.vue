@@ -56,16 +56,6 @@
             </view>
           </view>
 
-          <!-- 区块：退款提示 / 通栏告警条 / 仅在已退款或申请被驳回时出现 -->
-          <view v-if="showRefund" class="notice notice--warn mt12">
-            <AppIcon name="coins" :size="15" color="#8E6210" />
-            <text class="grow">
-              <text v-if="order.refundStatus === 'rejected'">退款申请已驳回</text>
-              <text v-else>已退款 ¥{{ money(order.refundAmount || 0) }}</text>
-              <text v-if="order.refundReason"> · {{ order.refundReason }}</text>
-            </text>
-          </view>
-
           <!-- 区块：物流信息 / 四态切换（加载中 / 失败重试 / 暂无 / 已发货信息）/ 只展示单号与电话，不展示轨迹 -->
           <view class="card card--pad mt12">
             <view class="row row--between">
@@ -200,6 +190,55 @@
             </view>
           </view>
 
+          <!-- 区块：配送与售后规则 / 使用订单接口下发的新政策 -->
+          <view class="notice notice--info mt12">
+            <AppIcon name="info" :size="15" color="#0A6A6C" />
+            <view class="grow">
+              <text class="policy-line">{{ shopPolicy.deliveryPolicy }}</text>
+              <text class="policy-line">{{ shopPolicy.afterSalePolicy }}</text>
+            </view>
+          </view>
+
+          <!-- 区块：退款申请 / 仅完成后七天内开放入口，申请后展示审核记录 -->
+          <view v-if="order.refundRequest || order.refundEligible || order.refundExpired" class="card card--pad mt12">
+            <view class="row row--between">
+              <view class="card__title">
+                <AppIcon name="coins" :size="16" color="#0A6A6C" />
+                <text>退款申请</text>
+              </view>
+              <text v-if="order.refundRequest" class="tag" :class="refundMeta.cls">{{ refundMeta.text }}</text>
+            </view>
+
+            <template v-if="order.refundRequest">
+              <view class="kv"><text class="kv__k">申请编号</text><text class="kv__v num break">{{ order.refundRequest.requestNo }}</text></view>
+              <view class="kv"><text class="kv__k">退款原因</text><text class="kv__v refund-reason">{{ order.refundRequest.reason }}</text></view>
+              <view class="refund-proof">
+                <text class="tiny">质量问题图片</text>
+                <view class="uploader mt8">
+                  <view v-for="(url, i) in order.refundRequest.images" :key="url" class="uploader__wrap">
+                    <image class="uploader__item" :src="proofUrl(url)" mode="aspectFill" @click="previewRefundProof(i)" />
+                  </view>
+                </view>
+              </view>
+              <view class="kv"><text class="kv__k">申请时间</text><text class="kv__v">{{ order.refundRequest.requestedAt }}</text></view>
+              <view v-if="order.refundRequest.reviewNote" class="notice notice--warn mt8">
+                <text class="grow">审核备注：{{ order.refundRequest.reviewNote }}</text>
+              </view>
+              <view v-if="order.refundRequest.reviewedAt" class="kv"><text class="kv__k">审核时间</text><text class="kv__v">{{ order.refundRequest.reviewedAt }}</text></view>
+              <text v-if="order.refundAmount" class="tiny" style="display: block; margin-top: 8px">已退款 ¥{{ money(order.refundAmount) }}</text>
+            </template>
+
+            <template v-else-if="order.refundEligible">
+              <text class="refund-tip">如商品存在质量问题，可在完成后七天内申请退款。</text>
+              <view class="btn btn--primary btn--block mt12" @click="openRefundForm">申请退款</view>
+              <text class="tiny refund-deadline">申请截止：{{ order.refundDeadline }}</text>
+            </template>
+            <view v-else class="notice notice--warn mt12">
+              <AppIcon name="info" :size="15" color="#8E6210" />
+              <text class="grow">该订单已超过完成后七天的退款申请期限</text>
+            </view>
+          </view>
+
           <!-- 区块：订单信息 / 编号、下单/支付/发货/完成/取消各节点时间 / 时间字段缺失时对应行不渲染 -->
           <view class="card card--pad mt12">
             <view class="card__title" style="margin-bottom: 6px">
@@ -250,6 +289,46 @@
       </template>
     </view>
 
+    <!-- 退款申请弹层：原因必填，质量凭证 1-3 张 -->
+    <view v-if="refundFormVisible" class="refund-modal" @click="closeRefundForm">
+      <view class="refund-dialog" @click.stop>
+        <text class="refund-dialog__title">申请质量问题退款</text>
+        <text class="tiny refund-dialog__sub">非质量问题不支持退款，请如实填写并上传凭证。</text>
+        <textarea
+          v-model="refundReason"
+          class="refund-textarea"
+          maxlength="1000"
+          placeholder="请详细描述商品质量问题（必填）"
+        />
+        <view class="row row--between mt8">
+          <text class="form-label">质量问题图片（1-3 张）</text>
+          <text class="tiny">{{ uploadedRefundCount }} / 3</text>
+        </view>
+        <view class="uploader mt8">
+          <view v-for="(p, i) in refundPhotos" :key="i" class="uploader__wrap">
+            <image class="uploader__item" :src="p.local || p.url" mode="aspectFill" @click="previewRefundPhoto(i)" />
+            <view v-if="p.status === 'uploading'" class="up-mask"><text>{{ p.progress }}%</text></view>
+            <view v-else-if="p.status === 'fail'" class="up-mask up-mask--fail"><text>失败</text></view>
+            <view v-if="p.status !== 'uploading'" class="uploader__rm" @click.stop="removeRefundPhoto(i)">
+              <AppIcon name="x" :size="12" color="#FFFFFF" />
+            </view>
+          </view>
+          <view v-if="refundPhotos.length < 3" class="uploader__add" @click="chooseRefundPhotos">
+            <AppIcon name="camera" :size="18" color="#9AA9A7" />
+            <text>添加图片</text>
+          </view>
+        </view>
+        <text v-if="refundUploading" class="tiny mt8" style="display: block">{{ refundUploadLabel || '图片上传中…' }}</text>
+        <text class="tiny refund-upload-rule">支持 JPG/PNG/WebP，单张不超过 5MB；点击图片可预览或删除。</text>
+        <view class="row refund-actions">
+          <view class="btn btn--line grow" @click="closeRefundForm">取消</view>
+          <view class="btn btn--primary grow" :class="{ 'is-loading': refundSubmitting }" @click="submitRefund">
+            <text>{{ refundSubmitting ? '' : '提交申请' }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <!-- 全局：全局浮层（登录/解锁/弹窗） -->
     <AppOverlays />
   </view>
@@ -268,6 +347,8 @@ import AppBar from '../../components/AppBar.vue'
 import AppIcon from '../../components/AppIcon.vue'
 import AppOverlays from '../../components/AppOverlays.vue'
 import Api from '../../common/api.js'
+import Store from '../../common/state.js'
+import { mediaUrl } from '../../common/request.js'
 import { money, orderStatusMeta, orderFlow } from '../../common/utils.js'
 import * as ui from '../../common/ui.js'
 
@@ -296,7 +377,13 @@ export default {
       lg: { company: '', no: '', phone: '', deliveryType: '', shippedAt: '' }, // 物流信息：公司/运单号/查询电话/配送方式/发货时间
       lgLoading: false, // 物流请求中，控制刷新按钮与加载态
       lgError: '', // 物流请求失败文案
-      lgUpdatedAt: '' // 最近一次刷新物流的时刻（HH:mm:ss）
+      lgUpdatedAt: '', // 最近一次刷新物流的时刻（HH:mm:ss）
+      refundFormVisible: false,
+      refundReason: '',
+      refundPhotos: [],
+      refundUploading: false,
+      refundUploadLabel: '',
+      refundSubmitting: false
     }
   },
   computed: {
@@ -318,13 +405,27 @@ export default {
     hasLogistics() {
       return !!(this.lg && this.lg.no)
     },
-    /** 是否展示退款提示条：存在退款金额或退款被驳回
-     * @returns {boolean}
-     */
-    showRefund() {
-      const o = this.order
-      if (!o) return false
-      return !!(o.refundAmount || o.refundStatus === 'rejected')
+    /** 退款审核状态标签 */
+    refundMeta() {
+      const status = this.order && this.order.refundRequest ? this.order.refundRequest.status : ''
+      return {
+        pending: { text: '待审核', cls: 'tag--accent' },
+        approved: { text: '已通过', cls: 'tag--success' },
+        rejected: { text: '已驳回', cls: 'tag--mute' }
+      }[status] || { text: status || '--', cls: 'tag--mute' }
+    },
+    /** 已成功上传的退款凭证数量 */
+    uploadedRefundCount() {
+      return this.refundPhotos.filter(p => p.status === 'done' && p.url).length
+    },
+    /** 全商品统一的配送与售后政策，订单响应优先、公共配置兜底 */
+    shopPolicy() {
+      const config = Store.config.shop
+      const order = this.order || {}
+      return {
+        deliveryPolicy: order.deliveryPolicy || config.deliveryPolicy,
+        afterSalePolicy: order.afterSalePolicy || config.afterSalePolicy
+      }
     }
   },
   /**
@@ -340,6 +441,12 @@ export default {
     }
     this.load()
   },
+  onShow() {
+    if (!this.loading && this.order) this.load(true)
+    this.ensureRefundSync()
+  },
+  onHide() { this.stopRefundSync() },
+  onUnload() { this.stopRefundSync() },
   methods: {
     money,
     /**
@@ -353,10 +460,14 @@ export default {
       return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',.12)'
     },
     /** 拉取订单详情，并把物流相关字段拆到 lg 对象中 */
-    async load() {
-      this.loading = true
+    async load(silent = false) {
+      if (this.refundLoading) return
+      this.refundLoading = true
+      const previousStatus = this.order && this.order.refundRequest ? this.order.refundRequest.status : ''
+      if (!silent) this.loading = true
       this.error = ''
       const res = await Api.fetchOrderDetail(this.no)
+      this.refundLoading = false
       this.loading = false
       if (res.code !== 0 || !res.data) {
         this.error = res.msg || '订单加载失败，请稍后重试'
@@ -371,6 +482,25 @@ export default {
         shippedAt: res.data.shippedAt || ''
       }
       this.lgError = ''
+      const current = res.data.refundRequest
+      const currentStatus = current ? current.status : ''
+      if (previousStatus === 'pending' && (currentStatus === 'approved' || currentStatus === 'rejected')) {
+        ui.toast(currentStatus === 'approved' ? '退款申请已审核通过' : '退款申请已驳回', currentStatus === 'approved' ? 'circle-check' : 'alert-triangle')
+      }
+      this.ensureRefundSync()
+    },
+    /** 审核中每 5 秒同步一次状态，其他状态不保留轮询 */
+    ensureRefundSync() {
+      this.stopRefundSync()
+      const request = this.order && this.order.refundRequest
+      if (!request || request.status !== 'pending') return
+      this.refundTimer = setInterval(() => {
+        if (!this.refundSubmitting) this.load(true)
+      }, 5000)
+    },
+    stopRefundSync() {
+      if (this.refundTimer) clearInterval(this.refundTimer)
+      this.refundTimer = null
     },
     /**
      * 手动刷新物流：同一时刻只允许一次请求
@@ -407,6 +537,127 @@ export default {
         phoneNumber: String(this.lg.phone),
         fail: () => ui.toast('拨号未完成，可手动拨打 ' + this.lg.phone, 'smartphone')
       })
+    },
+    /** 申请前明确告知非质量问题不支持退款 */
+    async openRefundForm() {
+      if (!this.order || !this.order.refundEligible) {
+        ui.toast('当前订单不在退款申请有效期内', 'alert-triangle')
+        return
+      }
+      const yes = await ui.confirm({
+        title: '申请退款',
+        text: '非质量问题不支持退款。请确认商品存在质量问题，并填写原因、上传 1-3 张质量问题图片。',
+        okText: '我已知晓',
+        cancelText: '取消'
+      })
+      if (!yes) return
+      this.refundReason = ''
+      this.refundPhotos = []
+      this.refundFormVisible = true
+    },
+    closeRefundForm() {
+      if (this.refundUploading || this.refundSubmitting) {
+        ui.toast('当前操作进行中，请稍候', 'info')
+        return
+      }
+      this.refundFormVisible = false
+    },
+    /** 选择凭证并预检格式和大小，服务端还会二次校验 */
+    chooseRefundPhotos() {
+      const remain = 3 - this.refundPhotos.length
+      if (remain <= 0 || this.refundUploading || this.refundSubmitting) return
+      uni.chooseImage({
+        count: remain,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera'],
+        success: res => {
+          const paths = res.tempFilePaths || []
+          const files = res.tempFiles && res.tempFiles.length
+            ? res.tempFiles.map((f, i) => ({ path: f.path || paths[i] || '', size: Number(f.size || 0) }))
+            : paths.map(path => ({ path, size: 0 }))
+          let formatRejected = false
+          let sizeRejected = false
+          const accepted = []
+          files.forEach(file => {
+            const extension = file.path.split('?')[0].match(/\.[a-z0-9]+$/i)
+            // 小程序相机/相册临时路径可能没有扩展名，交由服务端按真实图片格式校验
+            if (extension && !/^\.(jpe?g|png|webp)$/i.test(extension[0])) {
+              formatRejected = true
+              return
+            }
+            if (file.size > 5 * 1024 * 1024) {
+              sizeRejected = true
+              return
+            }
+            accepted.push(file.path)
+          })
+          if (formatRejected) ui.toast('仅支持 JPG、PNG、WebP 图片', 'alert-triangle')
+          if (sizeRejected) ui.toast('单张图片不能超过 5MB', 'alert-triangle')
+          this.uploadRefundPhotos(accepted.slice(0, remain))
+        },
+        fail: () => ui.toast('请授权相册或相机后再上传图片', 'alert-triangle')
+      })
+    },
+    async uploadRefundPhotos(paths) {
+      if (!paths.length) return
+      this.refundUploading = true
+      for (let k = 0; k < paths.length; k++) {
+        if (this.refundPhotos.length >= 3) break
+        const idx = this.refundPhotos.length
+        this.refundPhotos.push({ local: paths[k], url: '', status: 'uploading', progress: 0 })
+        const res = await Api.uploadSpotImage(paths[k], percent => {
+          if (this.refundPhotos[idx]) this.refundPhotos[idx].progress = percent
+          this.refundUploadLabel = '图片上传中 ' + (idx + 1) + '/' + this.refundPhotos.length + ' · ' + percent + '%'
+        })
+        if (!this.refundPhotos[idx]) continue
+        if (res.code === 0 && res.data && res.data.url) {
+          this.refundPhotos[idx].url = res.data.url
+          this.refundPhotos[idx].status = 'done'
+          this.refundPhotos[idx].progress = 100
+        } else {
+          this.refundPhotos[idx].status = 'fail'
+          ui.toast(res.msg || '图片上传失败，请重试', 'alert-triangle')
+        }
+      }
+      this.refundUploading = false
+      this.refundUploadLabel = ''
+    },
+    previewRefundPhoto(i) {
+      const urls = this.refundPhotos.map(p => p.local || p.url).filter(Boolean)
+      if (urls.length) uni.previewImage({ urls, current: urls[i] })
+    },
+    removeRefundPhoto(i) {
+      if (this.refundPhotos[i] && this.refundPhotos[i].status === 'uploading') return
+      this.refundPhotos.splice(i, 1)
+    },
+    proofUrl(url) { return mediaUrl(url) },
+    previewRefundProof(i) {
+      const request = this.order && this.order.refundRequest
+      if (request && request.images.length) {
+        const urls = request.images.map(url => mediaUrl(url))
+        uni.previewImage({ urls, current: urls[i] })
+      }
+    },
+    async submitRefund() {
+      if (this.refundSubmitting) return
+      const reason = String(this.refundReason || '').trim()
+      if (!reason) { ui.toast('请填写退款原因', 'alert-triangle'); return }
+      if (this.refundUploading) { ui.toast('图片仍在上传中，请稍候', 'alert-triangle'); return }
+      const images = this.refundPhotos.filter(p => p.status === 'done' && p.url).map(p => p.url)
+      if (!images.length) { ui.toast('请至少上传 1 张质量问题图片', 'alert-triangle'); return }
+      if (images.length > 3) { ui.toast('质量问题图片最多上传 3 张', 'alert-triangle'); return }
+      this.refundSubmitting = true
+      const res = await Api.applyRefund(this.no, { reason, images })
+      this.refundSubmitting = false
+      if (res.code !== 0 || !res.data) {
+        ui.toast(res.msg || '退款申请提交失败，请稍后重试', 'alert-triangle')
+        return
+      }
+      this.refundFormVisible = false
+      this.refundReason = ''
+      this.refundPhotos = []
+      ui.toast(res.msg || '退款申请提交成功', 'circle-check')
+      await this.load(true)
     },
     /** 复制订单编号到剪贴板 */
     copyOrderNo() {
@@ -498,6 +749,31 @@ export default {
   color: var(--c-primary-d); font-size: 12px; font-weight: 600; flex: none;
 }
 .pay-amt { font-family: var(--font-display); font-size: 19px; font-weight: 700; color: var(--c-accent-d); }
+.policy-line { display: block; line-height: 1.7; }
+.refund-tip { display: block; margin-top: 12px; color: var(--c-ink-2); line-height: 1.6; }
+.refund-deadline { display: block; margin-top: 8px; text-align: center; }
+.refund-reason { white-space: pre-wrap; word-break: break-all; }
+.refund-proof { padding: 10px 0; border-top: 1px solid var(--c-line-soft); }
+.refund-modal {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 2000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; background: rgba(5, 24, 24, .58); box-sizing: border-box;
+}
+.refund-dialog {
+  width: 100%; max-height: 86vh; overflow-y: auto; box-sizing: border-box;
+  padding: 20px; border-radius: var(--r-lg); background: var(--c-surface);
+}
+.refund-dialog__title { display: block; font-size: 19px; font-weight: 700; }
+.refund-dialog__sub { display: block; margin-top: 6px; line-height: 1.6; color: var(--c-danger); }
+.refund-textarea {
+  width: 100%; height: 116px; box-sizing: border-box; margin-top: 16px; padding: 12px;
+  border: 1px solid var(--c-line); border-radius: var(--r-sm); background: var(--c-surface-2);
+  font-size: 14px; line-height: 1.6;
+}
+.form-label { font-size: 13px; font-weight: 600; color: var(--c-ink-2); }
+.refund-upload-rule { display: block; margin-top: 10px; line-height: 1.6; }
+.refund-actions { gap: 10px; margin-top: 18px; }
+.refund-actions .btn { min-height: 44px; }
 
 /* 商品 */
 .gd-img { width: 84px; height: 84px; border-radius: var(--r-sm); flex: none; background: var(--c-line-soft); }

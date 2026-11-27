@@ -92,6 +92,10 @@ const ORDER_STATUS_MAP = {
     key: 'refunding', text: '退款中', desc: '退款申请处理中，请耐心等待',
     icon: 'refresh-cw', color: '#E8662B', cls: 'tag--accent'
   },
+  '待退款审核': {
+    key: 'refunding', text: '待退款审核', desc: '退款申请已提交，请等待管理员审核',
+    icon: 'refresh-cw', color: '#E8662B', cls: 'tag--accent'
+  },
   '部分退款': {
     key: 'partial', text: '部分退款', desc: '部分金额已退款到账',
     icon: 'coins', color: '#C08A2E', cls: 'tag--gold'
@@ -137,7 +141,7 @@ export function orderFlow(status) {
   // 退款类状态按已支付 / 已发货 / 已完成节点近似定位
   const indexMap = {
     '待支付': 0, '待发货': 1, '已发货': 2, '已完成': 3,
-    '退款中': 2, '部分退款': 3, '已退款': 3
+    '退款中': 2, '待退款审核': 3, '部分退款': 3, '已退款': 3
   }
   const current = indexMap[status] != null ? indexMap[status] : 0
   return nodes.map((n, i) => Object.assign({}, n, {

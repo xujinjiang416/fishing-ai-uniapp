@@ -111,19 +111,9 @@
           </view>
         </view>
 
-        <!-- 区块：服务保障与页脚 / 三列图标 + 免责说明 / 预留底部安全间距，避免被标签栏遮挡 -->
-        <view class="section">
-          <view class="card card--pad">
-            <view class="row" style="justify-content: space-around; gap: 6px">
-              <view v-for="x in services" :key="x.t" class="col" style="align-items: center; gap: 4px">
-                <AppIcon :name="x.ic" :size="20" color="#0A6A6C" />
-                <text class="svc-t">{{ x.t }}</text>
-              </view>
-            </view>
-          </view>
-          <view class="mt16" style="text-align: center; padding-bottom: 8px">
-            <text class="tiny" style="display: block">渔获 AI 商城 · {{ pointsPerYuan }} 积分 = 1 元，单笔最多抵 {{ maxYuan }} 元</text>
-          </view>
+        <!-- 页脚：预留底部安全间距，避免被标签栏遮挡 -->
+        <view class="section" style="text-align: center; padding-bottom: 8px">
+          <text class="tiny" style="display: block">渔获 AI 商城 · {{ pointsPerYuan }} 积分 = 1 元，单笔最多抵 {{ maxYuan }} 元</text>
         </view>
       </view>
     </view>
@@ -157,12 +147,7 @@ export default {
       cats: ['全部', '鱼竿', '渔轮', '饵料', '工具', '装备'], // 商品分类，'全部' 作为默认项
       cat: '全部', // 当前选中分类，切换后重新请求列表
       goods: [], // 当前分类下的商品列表
-      loading: true, // 商品骨架开关
-      services: [ // 服务保障文案（静态展示）
-        { ic: 'shield-check', t: '正品保障' },
-        { ic: 'truck', t: '顺丰包邮' },
-        { ic: 'refresh-cw', t: '7 天无理由' }
-      ]
+      loading: true // 商品骨架开关
     }
   },
   computed: {
@@ -251,7 +236,6 @@ export default {
   font-weight: 700;
 }
 .price-orig { font-size: 11px; color: var(--c-ink-4); margin-left: 5px; text-decoration: line-through; }
-.svc-t { font-size: 11.5px; color: var(--c-ink-3); }
 .rule-line { display: block; line-height: 1.7; }
 .rule-ex { color: var(--c-ink-3); }
 .mt14 { margin-top: 14px; }

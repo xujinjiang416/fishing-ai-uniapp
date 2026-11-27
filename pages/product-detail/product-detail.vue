@@ -162,13 +162,12 @@
             </view>
           </view>
 
-          <!-- 区块：服务保障 / 三列等距图标项 / 静态展示，无跳转 -->
-          <view class="card card--pad mt12">
-            <view class="row" style="justify-content: space-around; gap: 6px">
-              <view v-for="x in services" :key="x.t" class="col" style="align-items: center; gap: 4px">
-                <AppIcon :name="x.ic" :size="20" color="#0A6A6C" />
-                <text class="svc-t">{{ x.t }}</text>
-              </view>
+          <!-- 区块：配送与售后规则 / 与后端全商品统一配置保持一致 -->
+          <view class="notice notice--info mt12">
+            <AppIcon name="info" :size="15" color="#0A6A6C" />
+            <view class="grow">
+              <text class="policy-line">{{ shopPolicy.deliveryPolicy }}</text>
+              <text class="policy-line">{{ shopPolicy.afterSalePolicy }}</text>
             </view>
           </view>
 
@@ -210,6 +209,7 @@ import AppOverlays from '../../components/AppOverlays.vue'
 import Api from '../../common/api.js'
 import Store from '../../common/state.js'
 import { money } from '../../common/utils.js'
+import { nav } from '../../common/nav.js'
 import * as ui from '../../common/ui.js'
 
 export default {
@@ -222,12 +222,7 @@ export default {
       usePoints: 0, // 本次抵扣使用的整数积分，不再要求 150 的整数倍
       maxUsable: 0, // 当前可抵扣积分上限（可用积分/10 元封顶/商品金额三者取最小）
       addresses: [], // 收货地址列表
-      selectedAddressId: 0, // 已选地址 ID，0 表示未选择
-      services: [
-        { ic: 'shield-check', t: '正品保障' },
-        { ic: 'truck', t: '顺丰包邮' },
-        { ic: 'refresh-cw', t: '7 天无理由' }
-      ]
+      selectedAddressId: 0 // 已选地址 ID，0 表示未选择
     }
   },
   computed: {
@@ -279,6 +274,14 @@ export default {
      */
     selectedAddress() {
       return this.addresses.filter(a => a.id === this.selectedAddressId)[0] || null
+    },
+    /** 全商品统一的配送与售后政策，商品响应优先、公共配置兜底 */
+    shopPolicy() {
+      const config = Store.config.shop
+      return {
+        deliveryPolicy: (this.G && this.G.deliveryPolicy) || config.deliveryPolicy,
+        afterSalePolicy: (this.G && this.G.afterSalePolicy) || config.afterSalePolicy
+      }
     }
   },
   /**
@@ -393,6 +396,8 @@ export default {
           + '\n收货人 ' + this.selectedAddress.receiver + ' ' + this.selectedAddress.phone
           + '\n' + this.selectedAddress.fullAddress
           + '\n积分抵扣 ' + this.usePoints + ' 分（-¥' + this.deduct.toFixed(2) + '）'
+          + '\n' + this.shopPolicy.deliveryPolicy
+          + '\n' + this.shopPolicy.afterSalePolicy
           + '\n实付 ¥' + this.pay.toFixed(2),
         okText: '确认支付 ¥' + this.pay.toFixed(2)
       })
@@ -522,7 +527,7 @@ export default {
 .stepper__qty { min-width: 24px; text-align: center; font-weight: 700; }
 .pt-cur { font-size: 13px; color: #8C6420; }
 .pt-label { font-weight: 700; color: #8C6420; font-size: 13px; text-align: right; }
-.svc-t { font-size: 11.5px; color: var(--c-ink-3); }
+.policy-line { display: block; line-height: 1.7; }
 .pd-pay { gap: 1px; }
 .pd-pay-cur { font-size: 14px; color: var(--c-accent-d); font-weight: 700; }
 .pd-pay-num {
