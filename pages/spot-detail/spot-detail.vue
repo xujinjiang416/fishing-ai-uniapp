@@ -589,7 +589,7 @@ export default {
         Api.track('spot_view', { spotId: this.spotId, locked: !!this.S.locked }, 'spot')
       })
     },
-    /** 图片地址补全（本地 /static/uploads 相对路径 -> 服务端绝对地址） */
+    /** 图片地址补全（历史 /static 相对路径补服务端源站；云存储绝对地址原样返回） */
     imgUrl(u) { return mediaUrl(u) },
     /**
      * 应用评论接口结果（兼容旧数组契约）

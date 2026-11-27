@@ -257,6 +257,17 @@ const Api = {
     return callUpload('/uploads/spot', filePath, { name: 'file', onProgress })
   },
 
+  /* POST /api/uploads/refund multipart file -> { url }（退款凭证，私有存储） */
+  /**
+   * 上传退款质量问题凭证
+   * @param {string} filePath 本地临时文件路径
+   * @param {Function} [onProgress] 上传进度回调，参数为 0~100
+   * @returns {Promise<{code: number, data: *, msg?: string}>} data 含 { url }
+   */
+  async uploadRefundImage(filePath, onProgress) {
+    return callUpload('/uploads/refund', filePath, { name: 'file', onProgress })
+  },
+
   /* POST /api/spot-submissions body:{kind,name,region,coord,address,water,fish[],pay,note,photos[],cover} */
   /**
    * 提交钓点投稿

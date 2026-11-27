@@ -253,7 +253,7 @@
 <script>
 /* 上报钓点（pages/spot-submit/spot-submit）
  * 数据接口：
- *   Api.uploadSpotImage(filePath)   逐张上传现场照片，返回 /static 相对地址
+ *   Api.uploadSpotImage(filePath)   逐张上传现场照片，返回云存储公开地址
  *   Api.submitSpot(payload)         提交新钓点投稿（kind=new_spot）
  * 位置策略：H5 使用内置瓦片地图选点（uni.chooseLocation 需要地图 SDK Key，未配置会直接失败）；
  *           小程序 / App 优先系统选点，失败时回退到内置地图；也可直接手填经纬度。

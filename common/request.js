@@ -16,34 +16,35 @@
  */
 import Store from './state.js'
 import { toLogin } from './nav.js'
+import { ENV_CONFIG, ENV_NAME } from './env.js'
 
-/* 云开发环境：与小程序绑定的环境 ID */
-export const CLOUD_ENV = 'fishing-ai-dev-d4gchkp0uf94eea4f'
+/* 云开发环境：由 common/env.js 按小程序运行版本自动匹配 */
+export const CLOUD_ENV = ENV_CONFIG.cloudEnv
 /* 云托管服务名：callContainer 通过 X-WX-SERVICE 路由到该服务 */
-export const CLOUD_SERVICE = 'fishing-api'
+export const CLOUD_SERVICE = ENV_CONFIG.cloudService
 
-/* 是否启用 callContainer：
- * CloudBase PostgreSQL 模式环境在微信云开发中「暂不支持选择」，
- * 无法完成小程序 AppID 与环境绑定，故关闭容器通道，直接走 HTTPS。
- * 如后续迁移到传统模式环境，可改为 true 并重新绑定。
- */
-const USE_CONTAINER = false
+/* 是否启用 callContainer：PG 模式环境固定关闭；由环境配置控制 */
+const USE_CONTAINER = ENV_CONFIG.useContainer
 
-/* 后端地址（小程序 / H5 / App 统一使用）：
- * - 正式环境：云托管公网地址 + /api
- * - 本地联调：可临时改为 http://127.0.0.1:8000/api
- * @type {string}
- */
-export const BASE_URL = 'https://fishing-api-355464-8-1306325032.sh.run.tcloudbase.com/api'
+/* 后端地址：由 common/env.js 按开发版/体验版/正式版自动匹配 */
+export const BASE_URL = ENV_CONFIG.apiBase
 
 /* 本地存储中的 token 键名（与 Store 的业务状态分开存放，便于单独清除） */
 const TOKEN_KEY = 'fishai.token'
 
 let cloudInited = false
 
+/** 环境未配置时的统一错误（正式版未填生产地址时触发） */
+function envError() {
+  const e = new Error(`${ENV_NAME}尚未配置服务地址，请联系管理员`)
+  e.code = -2
+  e.business = false
+  return e
+}
+
 /** 判断当前运行时是否启用云托管 callContainer（PG 模式环境固定关闭） */
 function canUseContainer() {
-  if (!USE_CONTAINER) return false
+  if (!USE_CONTAINER || !CLOUD_ENV || !CLOUD_SERVICE) return false
   // #ifdef MP-WEIXIN
   return typeof wx !== 'undefined' && !!wx.cloud && typeof wx.cloud.callContainer === 'function'
   // #endif
@@ -54,7 +55,7 @@ function canUseContainer() {
 
 /** 懒初始化云开发（多次调用安全；未绑定环境时静默失败，由 HTTP 兜底） */
 function ensureCloud() {
-  if (cloudInited) return
+  if (cloudInited || !CLOUD_ENV) return
   if (typeof wx !== 'undefined' && wx.cloud) {
     try {
       wx.cloud.init({ env: CLOUD_ENV, traceUser: true })
@@ -69,6 +70,7 @@ function ensureCloud() {
  * @returns {Promise<{statusCode: number, data: *}>} 原始响应（不解包）
  */
 function containerRequest(opts) {
+  if (!CLOUD_ENV || !CLOUD_SERVICE) return Promise.reject(envError())
   ensureCloud()
   const { path, method = 'GET', data = null, header = {} } = opts || {}
   return new Promise((resolve, reject) => {
@@ -141,6 +143,7 @@ export function mediaUrl(path) {
   if (/^(https?:)?\/\//i.test(s) || s.indexOf('data:') === 0) return s
   if (s.indexOf('wxfile:') === 0 || s.indexOf('file:') === 0 || s.indexOf('blob:') === 0) return s
   const origin = BASE_URL.replace(/\/api\/?$/, '')
+  if (!origin) return ''
   return origin + (s.charAt(0) === '/' ? s : '/' + s)
 }
 
@@ -180,6 +183,7 @@ function handleResponse(res) {
  * @returns {Promise<*>} 解包后的 body.data
  */
 function httpRequest(opts) {
+  if (!BASE_URL) return Promise.reject(envError())
   const { path, method = 'GET', data = null, header = {}, timeout = 12000 } = opts || {}
   return new Promise((resolve, reject) => {
     uni.request({
@@ -201,6 +205,7 @@ function httpRequest(opts) {
  * @returns {Promise<*>} 解包后的 body.data
  */
 function httpUpload(opts) {
+  if (!BASE_URL) return Promise.reject(envError())
   const { path, filePath, name = 'file', formData = {}, header = {}, timeout = 60000, onProgress } = opts || {}
   return new Promise((resolve, reject) => {
     const task = uni.uploadFile({
@@ -228,6 +233,7 @@ function httpUpload(opts) {
  * @returns {Promise<*>} 解包后的 body.data
  */
 export function upload(opts) {
+  if (!BASE_URL) return Promise.reject(envError())
   const { url, filePath, name = 'file', formData = {}, auth = true, timeout = 60000, onProgress } = opts || {}
   const header = {}
   const token = getToken()

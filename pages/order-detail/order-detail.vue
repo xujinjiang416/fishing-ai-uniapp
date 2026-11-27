@@ -605,7 +605,7 @@ export default {
         if (this.refundPhotos.length >= 3) break
         const idx = this.refundPhotos.length
         this.refundPhotos.push({ local: paths[k], url: '', status: 'uploading', progress: 0 })
-        const res = await Api.uploadSpotImage(paths[k], percent => {
+        const res = await Api.uploadRefundImage(paths[k], percent => {
           if (this.refundPhotos[idx]) this.refundPhotos[idx].progress = percent
           this.refundUploadLabel = '图片上传中 ' + (idx + 1) + '/' + this.refundPhotos.length + ' · ' + percent + '%'
         })
